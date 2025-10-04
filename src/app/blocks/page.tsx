@@ -234,7 +234,7 @@ export default function BlocksPage() {
                             {formatTimestamp(block.timestamp)}
                           </span>
                         </div>
-                        <div className="flex items-center space-x-4 mt-1 text-sm text-lime-400">
+                        <div className="grid grid-cols-3 gap-4 mt-1 text-sm text-lime-400">
                           <span>Validator: {block.miner?.slice(0, 10)}...</span>
                           <span>Gas: {formatGas(block.gasUsed)}</span>
                           <span>Full: {(() => {
