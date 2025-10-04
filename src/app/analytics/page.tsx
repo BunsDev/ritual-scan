@@ -416,25 +416,6 @@ export default function AnalyticsPage() {
                 )}
               </p>
             </div>
-            <div className="flex items-center gap-3">
-              <button
-                onClick={loadAnalyticsData}
-                disabled={loading}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium flex items-center gap-2"
-              >
-                {loading ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    Refreshing...
-                  </>
-                ) : (
-                  <>
-                    🔄 Refresh Data
-                  </>
-                )}
-              </button>
-
-            </div>
           </div>
         </div>
 
