@@ -25,7 +25,6 @@ export function ParticleToggleSimple() {
       const canvas = document.getElementById('particle-bg');
       if (canvas) {
         canvas.style.display = isEnabled ? 'block' : 'none';
-        console.log('Applied particle state:', isEnabled ? 'enabled' : 'disabled');
       }
     };
 
