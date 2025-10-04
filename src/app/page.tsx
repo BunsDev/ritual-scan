@@ -33,15 +33,8 @@ export default function HomePage() {
   const realtimeStats = useRealtimeStats()
   const transactionFeed = useTransactionFeed(20)
 
-  // Debug WebSocket connection status
-  useEffect(() => {
-    console.log('🌐 WebSocket stats:', {
-      latestBlock: realtimeStats.latestBlock,
-      gasPrice: realtimeStats.gasPrice,
-      transactionCount: transactionFeed.length,
-      lastUpdate: new Date(realtimeStats.lastUpdate).toLocaleTimeString()
-    })
-  }, [realtimeStats, transactionFeed])
+  // WebSocket connection status (silent - no logs)
+  // Stats are available in realtimeStats and transactionFeed
 
   // Add particle background (using working implementation)
   useParticleBackground({ 
@@ -56,9 +49,7 @@ export default function HomePage() {
   // Lightweight block refresh for WebSocket updates
   const refreshBlocks = useCallback(async () => {
     try {
-      console.log('📊 Refreshing blocks via WebSocket trigger...')
       const recentBlocks = await rethClient.getRecentBlocks(10)
-      console.log('📦 Updated blocks:', recentBlocks.map(b => `${b.number}(${b.transactions?.length || 0} txs)`))
       
       // Extract transactions from recent blocks for real-time count update
       const allRecentTransactions: any[] = []
@@ -99,7 +90,6 @@ export default function HomePage() {
         const blockChanged = prev.latestBlock !== realtimeStats.latestBlock
         
         if (blockChanged) {
-          console.log('🔄 Block changed via WebSocket:', prev.latestBlock, '→', realtimeStats.latestBlock)
           // Async fetch new blocks data without blocking the UI
           refreshBlocks().catch(err => console.warn('Failed to update blocks:', err))
         }
@@ -115,7 +105,8 @@ export default function HomePage() {
         }
       })
     }
-  }, [realtimeStats, transactionFeed, refreshBlocks])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [realtimeStats.latestBlock])
 
   // High-performance silent update for real-time changes
   const silentUpdate = useCallback(async (newBlockData?: any) => {

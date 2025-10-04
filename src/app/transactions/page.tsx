@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useTransition } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { rethClient } from '@/lib/reth-client'
 import { Navigation } from '@/components/Navigation'
 import { getRealtimeManager } from '@/lib/realtime-websocket'
@@ -25,10 +25,8 @@ export default function TransactionsPage() {
   useParticleBackground()
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [initialLoading, setInitialLoading] = useState(true)
-  const [isUpdating, setIsUpdating] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [latestBlock, setLatestBlock] = useState<number>(0)
-  const [isPending, startTransition] = useTransition()
   const [lastUpdateTime, setLastUpdateTime] = useState<number>(0)
 
   // Smart cache loader for transactions
@@ -107,45 +105,40 @@ export default function TransactionsPage() {
     if (now - lastUpdateTime < 2000) return // Max 1 update per 2 seconds
     
     setLastUpdateTime(now)
-    setIsUpdating(true)
     
     try {
-      startTransition(async () => {
-        // Get recent blocks with transactions  
-        const recentBlocks = await rethClient.getRecentBlocks(5)
-        const recentTransactions: Transaction[] = []
-        
-        for (const block of recentBlocks.slice(0, 3)) {
-          if (block.transactions && Array.isArray(block.transactions)) {
-            for (const tx of block.transactions.slice(0, 10)) {
-              if (tx && typeof tx === 'object' && tx.hash) {
-                recentTransactions.push(tx)
-                if (recentTransactions.length >= 50) break
-              }
+      // Get recent blocks with transactions  
+      const recentBlocks = await rethClient.getRecentBlocks(5)
+      const recentTransactions: Transaction[] = []
+      
+      for (const block of recentBlocks.slice(0, 3)) {
+        if (block.transactions && Array.isArray(block.transactions)) {
+          for (const tx of block.transactions.slice(0, 10)) {
+            if (tx && typeof tx === 'object' && tx.hash) {
+              recentTransactions.push(tx)
+              if (recentTransactions.length >= 50) break
             }
           }
-          if (recentTransactions.length >= 50) break
         }
-        
-        setTransactions(prevTransactions => {
-          // Smart merge - only update if we have new transactions
-          if (recentTransactions.length > 0 && prevTransactions.length > 0) {
-            const latestPrevTx = prevTransactions[0]?.hash
-            const latestNewTx = recentTransactions[0]?.hash
-            
-            // Only update if we have a different latest transaction
-            if (latestNewTx !== latestPrevTx) {
-              return recentTransactions
-            }
-            return prevTransactions
+        if (recentTransactions.length >= 50) break
+      }
+      
+      setTransactions(prevTransactions => {
+        // Smart merge - only update if we have new transactions
+        if (recentTransactions.length > 0 && prevTransactions.length > 0) {
+          const latestPrevTx = prevTransactions[0]?.hash
+          const latestNewTx = recentTransactions[0]?.hash
+          
+          // Only update if we have a different latest transaction
+          if (latestNewTx !== latestPrevTx) {
+            return recentTransactions
           }
-          return recentTransactions
-        })
+          return prevTransactions
+        }
+        return recentTransactions
       })
     } catch (error) {
       console.warn('Silent transactions update failed:', error)
-    } finally {
-      setIsUpdating(false)
     }
   }, [lastUpdateTime])
 
@@ -233,12 +226,6 @@ export default function TransactionsPage() {
                 Real-time transactions from RETH nodes • Latest Block: #{latestBlock.toLocaleString()}
               </p>
             </div>
-            {isUpdating && (
-              <div className="flex items-center space-x-2 text-sm text-lime-400">
-                <div className="w-2 h-2 bg-lime-400 rounded-full animate-pulse"></div>
-                <span>Updating transactions...</span>
-              </div>
-            )}
           </div>
           <div className="mt-4 p-4 bg-white/5 border border-lime-500/20 rounded-lg">
             <TransactionTypeLegend />
@@ -272,7 +259,7 @@ export default function TransactionsPage() {
           </div>
         ) : (
           <div className="bg-white/5 backdrop-blur-sm shadow-lg overflow-hidden sm:rounded-md border border-lime-500/20">
-            <ul className={`divide-y divide-lime-500/10 transition-opacity duration-300 ${isPending ? 'opacity-75' : 'opacity-100'}`}>
+            <ul className="divide-y divide-lime-500/10">
               {transactions.map((tx) => (
                 <li key={tx.hash} className="px-6 py-4 hover:bg-lime-500/5">
                   <div className="flex items-center justify-between">

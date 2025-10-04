@@ -13,15 +13,19 @@ export type UpdateCallback = (update: RealtimeUpdate) => void
 // Debug mode - set to false for production
 const DEBUG_MODE = false
 
+// Cache size limits
+const MAX_GLOBAL_CACHE_BLOCKS = 500  // Shared across all pages (rolling window)
+const MAX_PAGE_WINDOW_BLOCKS = 1000  // Per-page expanding window limit
+
 class RealtimeWebSocketManager {
   private ws: WebSocket | null = null
-  // Smart caching for instant page loads (ROLLING WINDOW - max 50 blocks)
+  // Smart caching for instant page loads (ROLLING WINDOW - max 500 blocks)
   private recentBlocksCache: any[] = []
   private recentTransactionsCache: any[] = []
   private latestMempoolStats: any = {}
   private latestScheduledTxs: any[] = []
   private latestAsyncCommitments: any[] = []
-  // Per-page expanding windows (UNLIMITED - persists while user stays on page)
+  // Per-page expanding windows (CAPPED at 1000 blocks per page - persists while user stays on page)
   private pageBlockWindows: Map<string, any[]> = new Map()
   private reconnectAttemps = 0
   private maxReconnectAttempts = 10
@@ -320,9 +324,9 @@ class RealtimeWebSocketManager {
 
         // **CRITICAL FIX**: Add to cache for smart caching
         this.recentBlocksCache.unshift(enhancedBlockData)
-        // Keep only last 50 blocks to prevent memory issues
-        if (this.recentBlocksCache.length > 50) {
-          this.recentBlocksCache = this.recentBlocksCache.slice(0, 50)
+        // Keep only last 500 blocks (rolling window)
+        if (this.recentBlocksCache.length > MAX_GLOBAL_CACHE_BLOCKS) {
+          this.recentBlocksCache = this.recentBlocksCache.slice(0, MAX_GLOBAL_CACHE_BLOCKS)
         }
         
         // Reduce logging spam - only log every 5th block
@@ -566,8 +570,16 @@ class RealtimeWebSocketManager {
       return
     }
     
-    // Add to front (newest first)
+    // Add to front (newest first) - O(1) operation
     currentWindow.unshift(block)
+    
+    // Enforce 1000 block limit - keep most recent, trim oldest (deque-like behavior)
+    if (currentWindow.length > MAX_PAGE_WINDOW_BLOCKS) {
+      const removed = currentWindow.pop() // Remove oldest from back - O(1) operation
+      const removedBlockNum = removed ? parseInt(removed.number || removed.blockNumber, 16) : '?'
+      this.logImportant(`🗑️ [${this.connectionId}] Page '${pageId}' exceeded ${MAX_PAGE_WINDOW_BLOCKS} block limit - removed oldest block #${removedBlockNum} (keeping most recent ${currentWindow.length})`)
+    }
+    
     this.pageBlockWindows.set(pageId, currentWindow)
     this.log(`➕ [${this.connectionId}] Added block #${blockNumber} to '${pageId}' window (total: ${currentWindow.length})`)
   }
@@ -575,6 +587,18 @@ class RealtimeWebSocketManager {
   clearPageBlockWindow(pageId: string) {
     this.pageBlockWindows.delete(pageId)
     this.log(`🗑️ [${this.connectionId}] Cleared '${pageId}' window`)
+  }
+
+  // Get stats for all page windows
+  getPageWindowsStats(): Record<string, { blocks: number, maxBlocks: number }> {
+    const stats: Record<string, { blocks: number, maxBlocks: number }> = {}
+    this.pageBlockWindows.forEach((blocks, pageId) => {
+      stats[pageId] = { 
+        blocks: blocks.length,
+        maxBlocks: MAX_PAGE_WINDOW_BLOCKS
+      }
+    })
+    return stats
   }
 
   getConnectionStatus() {
@@ -602,7 +626,8 @@ class RealtimeWebSocketManager {
         wsState: this.ws?.readyState
       },
       cache: {
-        blocksCount: this.recentBlocksCache.length,
+        globalBlocks: this.recentBlocksCache.length,
+        globalMaxBlocks: MAX_GLOBAL_CACHE_BLOCKS,
         scheduledTxsCount: this.latestScheduledTxs.length,
         mempoolStatsKeys: Object.keys(this.latestMempoolStats),
         firstBlock: this.recentBlocksCache[0] ? {
@@ -610,6 +635,11 @@ class RealtimeWebSocketManager {
           hash: this.recentBlocksCache[0].hash,
           timestamp: this.recentBlocksCache[0].timestamp
         } : null
+      },
+      pageWindows: this.getPageWindowsStats(),
+      limits: {
+        globalCache: `${MAX_GLOBAL_CACHE_BLOCKS} blocks (rolling)`,
+        perPageWindow: `${MAX_PAGE_WINDOW_BLOCKS} blocks (most recent)`
       },
       subscribers: this.callbacks.size
     }

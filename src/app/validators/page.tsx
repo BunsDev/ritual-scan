@@ -33,13 +33,13 @@ export default function ValidatorsPage() {
   const [blockRange, setBlockRange] = useState({ start: 0, end: 0 })
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
   const [isMounted, setIsMounted] = useState(false)
-  const [isUpdating, setIsUpdating] = useState(false)
   
   // Cache of all blocks for efficient updates (continuous expanding window)
   const blockCache = useRef<BlockCache[]>([])
   const latestBlockRef = useRef<number>(0)
   const isProcessingRef = useRef<boolean>(false)
   const handleNewBlockRef = useRef<(blockHeader: any) => Promise<void>>(async () => {})
+  const cacheLoadedRef = useRef<boolean>(false)
 
   // Recalculate validator stats from block cache
   const recalculateValidatorStats = useCallback(() => {
@@ -128,40 +128,48 @@ export default function ValidatorsPage() {
     })
     
     validatorStats.sort((a, b) => b.blocksProposed - a.blocksProposed)
-    console.log(`📊 [Validators] Recalculated stats: ${validatorStats.length} validators from ${totalBlocksAnalyzed} blocks`)
     setValidators(validatorStats)
     setLastUpdate(new Date())
   }, [])
 
-  // Initialize with cached blocks from smart cache
-  const loadCachedData = useCallback(async (retryCount = 0, maxRetries = 5) => {
+  // Initialize with cached blocks from smart cache - NO DELAYS
+  const loadCachedData = useCallback(() => {
     try {
-      console.log(`🔍 [DEBUG] loadCachedData called (attempt ${retryCount + 1}/${maxRetries + 1})`)
       const manager = getRealtimeManager()
-      console.log('🔍 [DEBUG] Manager:', manager)
+      if (!manager) return false // SSR or not initialized
       
-      if (!manager) {
-        console.error('❌ [DEBUG] No realtime manager found!')
-        return false
+      // FIRST: Check if we have a persistent page-specific window from previous visit
+      const pageWindow = manager.getPageBlockWindow('validators')
+      if (pageWindow && pageWindow.length > 0) {
+        blockCache.current = pageWindow.map((block: any) => ({
+          number: parseInt(block.number, 16),
+          miner: block.miner || block.author || '0x0000000000000000000000000000000000000000',
+          timestamp: parseInt(block.timestamp, 16)
+        }))
+        
+        if (blockCache.current.length > 0) {
+          latestBlockRef.current = Math.max(...blockCache.current.map(b => b.number))
+        }
+        
+        recalculateValidatorStats()
+        setLoading(false)
+        cacheLoadedRef.current = true  // Mark as successfully loaded
+        return true
       }
       
-      // Check connection status
-      const status = manager.getConnectionStatus()
-      console.log('🔍 [DEBUG] Connection status:', status)
-      
-      // Use proper cache access method
+      // FALLBACK: Use global cache (max 50 blocks) to initialize
       const cachedBlocks = manager.getCachedBlocks()
-      console.log(`🔍 [DEBUG] Got ${cachedBlocks?.length || 0} cached blocks:`, cachedBlocks)
       
       if (cachedBlocks && cachedBlocks.length > 0) {
-        console.log(`🚀 [Validators] Using ${cachedBlocks.length} cached blocks for instant load`)
-        
         // Process cached blocks to build initial validator stats
         blockCache.current = cachedBlocks.map((block: any) => ({
           number: parseInt(block.number, 16),
           miner: block.miner || block.author || '0x0000000000000000000000000000000000000000',
           timestamp: parseInt(block.timestamp, 16)
         }))
+        
+        // Store in page window for persistence
+        manager.setPageBlockWindow('validators', cachedBlocks)
         
         // Update latest block reference
         if (blockCache.current.length > 0) {
@@ -171,23 +179,12 @@ export default function ValidatorsPage() {
         // Calculate initial stats from cached data
         recalculateValidatorStats()
         setLoading(false)
-        return true // Successfully loaded from cache
-      } else {
-        console.log(`🔍 [DEBUG] No cached blocks available yet (attempt ${retryCount + 1}/${maxRetries + 1})`)
-        
-        // Retry if cache is empty and we haven't exceeded max retries
-        if (retryCount < maxRetries) {
-          console.log(`⏳ [Validators] Cache empty, waiting 2s before retry...`)
-          await new Promise(resolve => setTimeout(resolve, 2000))
-          return loadCachedData(retryCount + 1, maxRetries)
-        } else {
-          console.log('⚠️ [Validators] Max retries reached, falling back to API')
-        }
+        cacheLoadedRef.current = true
+        return true
       }
       
-      return false // No cached data available
+      return false // Cache empty, fallback to API immediately
     } catch (error) {
-      console.warn('⚠️ [Validators] Failed to load cached data:', error)
       return false
     }
   }, [recalculateValidatorStats])
@@ -199,18 +196,15 @@ export default function ValidatorsPage() {
       
       // Skip if we've already processed this block
       if (blockNumber <= latestBlockRef.current) {
-        console.log(`⏭️ [Validators] Skipping block #${blockNumber} (already processed)`)
         return
       }
       
-      setIsUpdating(true)
       isProcessingRef.current = true
       latestBlockRef.current = blockNumber
       
       // Fetch full block to get miner info
       const fullBlock = await rethClient.getBlock(blockNumber, false)
       if (!fullBlock || !fullBlock.miner) {
-        console.warn(`⚠️ [Validators] Block #${blockNumber} has no miner info`)
         return
       }
       
@@ -220,17 +214,25 @@ export default function ValidatorsPage() {
         timestamp: parseInt(fullBlock.timestamp, 16)
       }
       
-      // Add to cache (continuous expanding window)
+      // Add to local cache (continuous expanding window - UNLIMITED)
       blockCache.current = [newBlock, ...blockCache.current]
+      
+      // Also persist to global page window for cross-navigation persistence
+      const manager = getRealtimeManager()
+      if (manager) {
+        manager.addBlockToPageWindow('validators', {
+          number: fullBlock.number,
+          miner: fullBlock.miner,
+          timestamp: fullBlock.timestamp
+        })
+      }
       
       // Recalculate validator stats from cache
       recalculateValidatorStats()
       
-      console.log(`✅ [Validators] Updated with block #${blockNumber} via WebSocket (total blocks: ${blockCache.current.length})`)
     } catch (error) {
       console.error('Failed to handle new block:', error)
     } finally {
-      setIsUpdating(false)
       isProcessingRef.current = false
     }
   }, [recalculateValidatorStats])
@@ -244,15 +246,10 @@ export default function ValidatorsPage() {
   useEffect(() => {
     setIsMounted(true)
     
-    // First try smart caching with retries, then fall back to regular loading
-    const initializeValidators = async () => {
-      const cacheLoaded = await loadCachedData()
-      if (!cacheLoaded) {
-        loadValidators()
-      }
+    // Try cache first, instant fallback to API
+    if (!loadCachedData()) {
+      loadValidators()
     }
-    
-    initializeValidators()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -263,14 +260,11 @@ export default function ValidatorsPage() {
       if (update.type === 'newBlock') {
         handleNewBlock(update.data)
         
-        // **FIX**: If this is the first block and we have cached data now, reload from cache
-        if (validators.length === 0 && realtimeManager.getCachedBlocks().length > 0) {
-          console.log('🔄 [Validators] Detected cache is now available, retrying cache load...')
-          loadCachedData().then((success) => {
-            if (success) {
-              console.log('✅ [Validators] Successfully loaded from cache on retry!')
-            }
-          })
+        // If cache wasn't loaded initially but is available now, try once
+        if (!cacheLoadedRef.current && validators.length === 0 && realtimeManager.getCachedBlocks().length > 0) {
+          if (loadCachedData()) {
+            console.log('✅ [Validators] Loaded from cache after WebSocket connected')
+          }
         }
       }
     })
@@ -278,7 +272,8 @@ export default function ValidatorsPage() {
     return () => {
       if (unsubscribe) unsubscribe()
     }
-  }, [handleNewBlock, loadCachedData])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [handleNewBlock])
 
   const loadValidators = async () => {
     try {
@@ -364,12 +359,6 @@ export default function ValidatorsPage() {
                 Real-time validator performance built live via WebSocket
               </p>
             </div>
-            {isUpdating && (
-              <div className="flex items-center space-x-2 text-sm text-lime-400">
-                <div className="w-2 h-2 bg-lime-400 rounded-full animate-pulse"></div>
-                <span>Updating...</span>
-              </div>
-            )}
           </div>
         </div>
 
