@@ -43,6 +43,7 @@ export default function AnalyticsPage() {
   const [error, setError] = useState<string | null>(null)
   const [dataSource, setDataSource] = useState<'cache' | 'api' | null>(null)
   const [isLive, setIsLive] = useState(false)
+  const [lastUpdateTime, setLastUpdateTime] = useState<Date | null>(null)
   
   // Refs for real-time updates
   const latestBlockRef = useRef<number>(0)
@@ -206,6 +207,7 @@ export default function AnalyticsPage() {
       
       // Reprocess all blocks and update charts
       processBlocks(blocksDataRef.current)
+      setLastUpdateTime(new Date())
       
       console.log(`✅ [Analytics] Updated with block #${blockNumber} (total: ${blocksDataRef.current.length} blocks)`)
     } catch (error) {
@@ -243,10 +245,34 @@ export default function AnalyticsPage() {
       setLoading(true)
       setError(null)
       
-      // Get recent 50 blocks for analytics (MUST be full blocks with transactions)
-      console.log(`📊 [Analytics] Fetching 50 full blocks for initial load`)
-      const recentBlocks = await rethClient.getRecentBlocks(50)
-      setDataSource('api')
+      const manager = getRealtimeManager()
+      let recentBlocks: any[] = []
+      let source: 'cache' | 'api' = 'api'
+      
+      // PHASE 3: Check if we have accumulated data from previous visit
+      if (manager) {
+        const pageWindowBlocks = manager.getPageBlockWindow('analytics')
+        if (pageWindowBlocks.length > 0) {
+          // User returning - use accumulated data!
+          console.log(`📊 [Analytics] Found ${pageWindowBlocks.length} accumulated blocks from previous session!`)
+          recentBlocks = pageWindowBlocks
+          source = 'cache'
+          
+          // Show message if we accumulated a lot while they were away
+          if (pageWindowBlocks.length > 100) {
+            console.log(`🎉 [Analytics] Extended dataset: ${pageWindowBlocks.length} blocks accumulated in background!`)
+          }
+        }
+      }
+      
+      // First visit or no cache - fetch fresh data
+      if (recentBlocks.length === 0) {
+        console.log(`📊 [Analytics] First visit - fetching 50 full blocks for initial load`)
+        recentBlocks = await rethClient.getRecentBlocks(50)
+        source = 'api'
+      }
+      
+      setDataSource(source)
       
       if (!recentBlocks.length) {
         throw new Error('No blocks available for analytics')
@@ -256,8 +282,8 @@ export default function AnalyticsPage() {
       blocksDataRef.current = recentBlocks
       latestBlockRef.current = parseInt(recentBlocks[0].number, 16)
       
-      const manager = getRealtimeManager()
-      if (manager) {
+      if (manager && source === 'api') {
+        // Only set if we fetched from API (cache already has it)
         manager.setPageBlockWindow('analytics', recentBlocks)
       }
       
@@ -364,8 +390,12 @@ export default function AnalyticsPage() {
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="text-center py-12">
             <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-lime-400"></div>
-            <p className="mt-2 text-lime-200">Loading analytics from RETH...</p>
-            <p className="mt-1 text-lime-400 text-sm">Fetching full block data for accurate metrics</p>
+            <p className="mt-2 text-lime-200">
+              {dataSource === 'cache' ? 'Loading accumulated analytics data...' : 'Loading analytics from RETH...'}
+            </p>
+            <p className="mt-1 text-lime-400 text-sm">
+              {dataSource === 'cache' ? '⚡ Loading blocks accumulated in background' : 'Fetching full block data for accurate metrics'}
+            </p>
           </div>
         </main>
       </div>
@@ -407,12 +437,25 @@ export default function AnalyticsPage() {
                     Live
                   </span>
                 )}
+                {dataSource === 'cache' && !isLive && (
+                  <span className="px-3 py-1 text-sm font-medium text-white bg-blue-600/20 border border-blue-500/30 rounded-full">
+                    ⚡ From Cache
+                  </span>
+                )}
               </div>
               <p className="text-lime-200">
-                Visual analytics from {data.blocks.length} recent blocks • 
-                {isLive ? ' Real-time updates active' : ' Live data from RETH nodes'}
+                Visual analytics from {data.blocks.length} recent blocks
+                {dataSource === 'cache' && data.blocks.length > 50 && !isLive && (
+                  <span className="text-blue-400"> • Loaded {data.blocks.length} blocks accumulated in background</span>
+                )}
+                {isLive && (
+                  <span className="text-lime-400"> • Real-time updates active</span>
+                )}
                 {data.blocks.length > 50 && (
-                  <span className="text-lime-400"> • Extended history ({(data.blocks.length * 2 / 60).toFixed(1)} min)</span>
+                  <span className="text-lime-400"> • {(data.blocks.length * 2 / 60).toFixed(1)} min of history</span>
+                )}
+                {lastUpdateTime && isLive && (
+                  <span className="text-lime-300"> • Last update: {lastUpdateTime.toLocaleTimeString()}</span>
                 )}
               </p>
             </div>
