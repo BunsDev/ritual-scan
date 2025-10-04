@@ -236,16 +236,18 @@ export default function BlocksPage() {
                         </div>
                         <div className="flex items-center space-x-4 mt-1 text-sm text-lime-400">
                           <span>Validator: {block.miner?.slice(0, 10)}...</span>
-                          <span>{Array.isArray(block.transactions) ? block.transactions.length : (typeof block.transactions === 'number' ? block.transactions : 0)} txns</span>
                           <span>Gas: {formatGas(block.gasUsed)}</span>
-                          <span>Size: {formatBlockSize(block.size || '0x0')}</span>
+                          <span>Full: {(() => {
+                            const gasUsed = parseInt(block.gasUsed || '0x0', 16)
+                            const gasLimit = parseInt(block.gasLimit || '0x0', 16)
+                            if (gasLimit === 0) return '0%'
+                            const percentage = (gasUsed / gasLimit) * 100
+                            return percentage.toFixed(3) + '%'
+                          })()}</span>
                         </div>
                       </div>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-lime-500/20 text-lime-300 border border-lime-500/30">
-                        {Array.isArray(block.transactions) ? block.transactions.length : (typeof block.transactions === 'number' ? block.transactions : 0)} TXs
-                      </span>
                       <Link
                         href={`/block/${parseInt(block.number, 16)}`}
                         className="text-lime-300 hover:text-white text-sm font-medium transition-colors"
