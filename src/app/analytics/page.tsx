@@ -41,6 +41,7 @@ export default function AnalyticsPage() {
   })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [dataSource, setDataSource] = useState<'cache' | 'api' | null>(null)
   
   // Chart visibility toggles - separate state for each chart
   const [gasUsageToggles, setGasUsageToggles] = useState({
@@ -74,8 +75,44 @@ export default function AnalyticsPage() {
       setLoading(true)
       setError(null)
       
-      // Get recent 50 blocks for analytics
-      const recentBlocks = await rethClient.getRecentBlocks(50)
+      // Phase 1: Try to load from cache first (up to 500 blocks!)
+      const manager = getRealtimeManager()
+      let recentBlocks: any[] = []
+      let source: 'cache' | 'api' = 'api'
+      
+      // Check per-page window first (accumulated data from previous visits)
+      const pageWindowBlocks = manager.getPageBlockWindow('analytics')
+      if (pageWindowBlocks.length > 0) {
+        console.log(`📊 [Analytics] Loading ${pageWindowBlocks.length} blocks from per-page window`)
+        recentBlocks = pageWindowBlocks.slice(0, 500) // Use up to 500 blocks
+        source = 'cache'
+      } 
+      // Fall back to global cache
+      else {
+        const cachedBlocks = manager.getCachedBlocks()
+        if (cachedBlocks.length > 0) {
+          console.log(`📊 [Analytics] Loading ${cachedBlocks.length} blocks from global cache`)
+          recentBlocks = cachedBlocks.slice(0, 200) // Use cached blocks (up to 200 for better performance)
+          source = 'cache'
+          
+          // Initialize per-page window with cached data
+          manager.setPageBlockWindow('analytics', recentBlocks)
+        }
+      }
+      
+      // If no cache available, fetch from API (original behavior)
+      if (recentBlocks.length === 0) {
+        console.log(`📊 [Analytics] No cache available, fetching 50 blocks from API`)
+        recentBlocks = await rethClient.getRecentBlocks(50)
+        source = 'api'
+        
+        // Initialize per-page window with API data
+        if (recentBlocks.length > 0) {
+          manager.setPageBlockWindow('analytics', recentBlocks)
+        }
+      }
+      
+      setDataSource(source)
       
       if (!recentBlocks.length) {
         throw new Error('No blocks available for analytics')
@@ -103,7 +140,7 @@ export default function AnalyticsPage() {
         const blockNum = parseInt(block.number, 16)
         const gasUsed = parseInt(block.gasUsed, 16)
         const gasLimit = parseInt(block.gasLimit, 16)
-        const txCount = block.transactions.length
+        const txCount = Array.isArray(block.transactions) ? block.transactions.length : 0
         const blockSize = parseInt(block.size || '0x0', 16)
         // Fix timestamp parsing - RETH returns timestamps that may be in milliseconds
         const timestampValue = parseInt(block.timestamp, 16)
@@ -284,7 +321,12 @@ export default function AnalyticsPage() {
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="text-center py-12">
             <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-lime-400"></div>
-            <p className="mt-2 text-lime-200">Loading analytics from RETH...</p>
+            <p className="mt-2 text-lime-200">
+              {dataSource === 'cache' ? 'Loading analytics from cache...' : 'Loading analytics from RETH...'}
+            </p>
+            {dataSource === 'cache' && (
+              <p className="mt-1 text-lime-400 text-sm">⚡ Instant load from cached blocks</p>
+            )}
           </div>
         </main>
       </div>
@@ -320,12 +362,25 @@ export default function AnalyticsPage() {
             <div>
               <div className="flex items-center gap-3 mb-2">
                 <h1 className="text-4xl font-bold text-white">Charts Dashboard</h1>
-                <span className="px-3 py-1 text-sm font-medium text-white bg-lime-600/20 border border-lime-500/30 rounded-full">
-                  Real-time
-                </span>
+                {dataSource === 'cache' && (
+                  <span className="px-3 py-1 text-sm font-medium text-white bg-blue-600/20 border border-blue-500/30 rounded-full">
+                    ⚡ Cached
+                  </span>
+                )}
+                {dataSource === 'api' && (
+                  <span className="px-3 py-1 text-sm font-medium text-white bg-lime-600/20 border border-lime-500/30 rounded-full">
+                    Live API
+                  </span>
+                )}
               </div>
               <p className="text-lime-200">
-                Visual analytics from {data.blocks.length} recent blocks • Live data from RETH nodes
+                Visual analytics from {data.blocks.length} recent blocks • 
+                {dataSource === 'cache' 
+                  ? ' Loaded from cache (instant!)' 
+                  : ' Live data from RETH nodes'}
+                {data.blocks.length > 50 && (
+                  <span className="text-lime-400"> • Showing extended history</span>
+                )}
               </p>
             </div>
             <div className="flex items-center gap-3">
