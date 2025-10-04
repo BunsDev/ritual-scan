@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import dynamic from 'next/dynamic'
 import { rethClient } from '@/lib/reth-client'
 import { Navigation } from '@/components/Navigation'
@@ -42,6 +42,11 @@ export default function AnalyticsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [dataSource, setDataSource] = useState<'cache' | 'api' | null>(null)
+  const [isLive, setIsLive] = useState(false)
+  
+  // Refs for real-time updates
+  const latestBlockRef = useRef<number>(0)
+  const blocksDataRef = useRef<any[]>([]) // Full blocks with transactions/size
   
   // Chart visibility toggles - separate state for each chart
   const [gasUsageToggles, setGasUsageToggles] = useState({
@@ -66,9 +71,172 @@ export default function AnalyticsPage() {
     perBlock: true, fiveMin: false, thirtyMin: false, oneHour: false
   })
 
+  // Process blocks into analytics data structure
+  const processBlocks = useCallback((blocks: any[]) => {
+    const blockNumbers: number[] = []
+    const timestamps: string[] = []
+    const avgGasUsed: number[] = []
+    const avgTxsPerBlock: number[] = []
+    const avgBlockSize: number[] = []
+    const gasEfficiency: number[] = []
+    const blockTimes: number[] = []
+
+    // Multi-timeframe aggregations
+    const timeframes = {
+      '5min': { timestamps: [] as string[], avgGasUsed: [] as number[], avgTxsPerBlock: [] as number[], gasEfficiency: [] as number[], avgBlockSize: [] as number[] },
+      '30min': { timestamps: [] as string[], avgGasUsed: [] as number[], avgTxsPerBlock: [] as number[], gasEfficiency: [] as number[], avgBlockSize: [] as number[] },
+      '1hr': { timestamps: [] as string[], avgGasUsed: [] as number[], avgTxsPerBlock: [] as number[], gasEfficiency: [] as number[], avgBlockSize: [] as number[] }
+    }
+
+    // Process blocks for analytics
+    for (let i = 0; i < blocks.length; i++) {
+      const block = blocks[i]
+      
+      const blockNum = parseInt(block.number, 16)
+      const gasUsed = parseInt(block.gasUsed, 16)
+      const gasLimit = parseInt(block.gasLimit, 16)
+      const txCount = Array.isArray(block.transactions) ? block.transactions.length : 0
+      const blockSize = parseInt(block.size || '0x0', 16)
+      const timestampValue = parseInt(block.timestamp, 16)
+      const timestamp = timestampValue > 1577836800000 ? 
+        new Date(timestampValue) : 
+        new Date(timestampValue * 1000)
+      
+      blockNumbers.push(blockNum)
+      timestamps.push(timestamp.toISOString())
+      avgGasUsed.push(gasUsed)
+      avgTxsPerBlock.push(txCount)
+      avgBlockSize.push(blockSize)
+      gasEfficiency.push((gasUsed / gasLimit) * 100)
+      
+      // Calculate block time
+      if (i < blocks.length - 1) {
+        const prevBlock = blocks[i + 1]
+        const prevTimestampValue = parseInt(prevBlock.timestamp, 16)
+        const currentTimestampValue = parseInt(block.timestamp, 16)
+        const prevTimestamp = prevTimestampValue > 1577836800000 ? prevTimestampValue : prevTimestampValue * 1000
+        const currentTimestamp = currentTimestampValue > 1577836800000 ? currentTimestampValue : currentTimestampValue * 1000
+        const blockTime = Math.abs(currentTimestamp - prevTimestamp) / 1000
+        blockTimes.push(blockTime)
+      }
+    }
+
+    // Time-based aggregations (existing code continues...)
+    const aggregateByTimeframe = (minutes: number, key: '5min' | '30min' | '1hr') => {
+      const intervalMs = minutes * 60 * 1000
+      const buckets = new Map<string, { gasUsed: number[], txs: number[], efficiency: number[], blockSize: number[], count: number }>()
+      
+      for (let i = 0; i < timestamps.length; i++) {
+        const timestamp = new Date(timestamps[i])
+        const bucketTime = new Date(Math.floor(timestamp.getTime() / intervalMs) * intervalMs)
+        const bucketKey = bucketTime.toISOString()
+        
+        if (!buckets.has(bucketKey)) {
+          buckets.set(bucketKey, { gasUsed: [], txs: [], efficiency: [], blockSize: [], count: 0 })
+        }
+        
+        const bucket = buckets.get(bucketKey)!
+        bucket.gasUsed.push(avgGasUsed[i])
+        bucket.txs.push(avgTxsPerBlock[i])
+        bucket.efficiency.push(gasEfficiency[i])
+        bucket.blockSize.push(avgBlockSize[i])
+        bucket.count++
+      }
+      
+      Array.from(buckets.entries())
+        .sort(([a], [b]) => a.localeCompare(b))
+        .forEach(([timestamp, bucket]) => {
+          timeframes[key].timestamps.push(timestamp)
+          timeframes[key].avgGasUsed.push(bucket.gasUsed.reduce((a, b) => a + b, 0) / bucket.gasUsed.length)
+          timeframes[key].avgTxsPerBlock.push(bucket.txs.reduce((a, b) => a + b, 0) / bucket.txs.length)
+          timeframes[key].gasEfficiency.push(bucket.efficiency.reduce((a, b) => a + b, 0) / bucket.efficiency.length)
+          timeframes[key].avgBlockSize.push(bucket.blockSize.reduce((a, b) => a + b, 0) / bucket.blockSize.length)
+        })
+    }
+
+    aggregateByTimeframe(5, '5min')
+    aggregateByTimeframe(30, '30min')
+    aggregateByTimeframe(60, '1hr')
+
+    setData({
+      blocks,
+      avgGasUsed,
+      avgTxsPerBlock,
+      avgBlockSize,
+      blockNumbers,
+      timestamps,
+      gasEfficiency,
+      blockTimes,
+      timeframes
+    })
+  }, [])
+
+  // Handle new blocks from WebSocket
+  const handleNewBlock = useCallback(async (blockHeader: any) => {
+    try {
+      const blockNumber = parseInt(blockHeader.number || blockHeader.blockNumber, 16)
+      
+      // Skip if already processed
+      if (blockNumber <= latestBlockRef.current) {
+        return
+      }
+      
+      console.log(`📊 [Analytics] New block #${blockNumber} - fetching full data...`)
+      
+      // Fetch full block with transactions and size
+      const fullBlock = await rethClient.getBlock(blockNumber, true)
+      if (!fullBlock) {
+        console.warn(`⚠️ [Analytics] Failed to fetch full block #${blockNumber}`)
+        return
+      }
+      
+      // Add to blocks data (keep most recent 1000 blocks)
+      blocksDataRef.current.unshift(fullBlock)
+      if (blocksDataRef.current.length > 1000) {
+        blocksDataRef.current = blocksDataRef.current.slice(0, 1000)
+      }
+      
+      latestBlockRef.current = blockNumber
+      
+      // Update per-page window
+      const manager = getRealtimeManager()
+      if (manager) {
+        manager.addBlockToPageWindow('analytics', fullBlock)
+      }
+      
+      // Reprocess all blocks and update charts
+      processBlocks(blocksDataRef.current)
+      
+      console.log(`✅ [Analytics] Updated with block #${blockNumber} (total: ${blocksDataRef.current.length} blocks)`)
+    } catch (error) {
+      console.error('Failed to handle new block in analytics:', error)
+    }
+  }, [processBlocks])
+
+  // Subscribe to WebSocket updates
   useEffect(() => {
     loadAnalyticsData()
-  }, [])
+    
+    // Subscribe to real-time block updates
+    const manager = getRealtimeManager()
+    if (!manager) return
+    
+    const unsubscribe = manager.subscribe('analytics-charts', (update) => {
+      if (update.type === 'newBlock') {
+        setIsLive(true)
+        handleNewBlock(update.data)
+      }
+    })
+    
+    console.log(`📡 [Analytics] Subscribed to real-time block updates`)
+    
+    return () => {
+      if (unsubscribe) {
+        unsubscribe()
+        console.log(`🔌 [Analytics] Unsubscribed from real-time updates`)
+      }
+    }
+  }, [handleNewBlock])
 
   const loadAnalyticsData = async () => {
     try {
@@ -76,8 +244,7 @@ export default function AnalyticsPage() {
       setError(null)
       
       // Get recent 50 blocks for analytics (MUST be full blocks with transactions)
-      // NOTE: Cached blocks are headers-only and break transaction/size charts
-      // TODO Phase 2: Implement real-time updates that handle header-only data
+      console.log(`📊 [Analytics] Fetching 50 full blocks for initial load`)
       const recentBlocks = await rethClient.getRecentBlocks(50)
       setDataSource('api')
       
@@ -85,108 +252,17 @@ export default function AnalyticsPage() {
         throw new Error('No blocks available for analytics')
       }
 
-      const blockNumbers: number[] = []
-      const timestamps: string[] = []
-      const avgGasUsed: number[] = []
-      const avgTxsPerBlock: number[] = []
-      const avgBlockSize: number[] = []
-      const gasEfficiency: number[] = []
-      const blockTimes: number[] = []
-
-      // Multi-timeframe aggregations
-      const timeframes = {
-        '5min': { timestamps: [] as string[], avgGasUsed: [] as number[], avgTxsPerBlock: [] as number[], gasEfficiency: [] as number[], avgBlockSize: [] as number[] },
-        '30min': { timestamps: [] as string[], avgGasUsed: [] as number[], avgTxsPerBlock: [] as number[], gasEfficiency: [] as number[], avgBlockSize: [] as number[] },
-        '1hr': { timestamps: [] as string[], avgGasUsed: [] as number[], avgTxsPerBlock: [] as number[], gasEfficiency: [] as number[], avgBlockSize: [] as number[] }
+      // Store in ref and per-page window
+      blocksDataRef.current = recentBlocks
+      latestBlockRef.current = parseInt(recentBlocks[0].number, 16)
+      
+      const manager = getRealtimeManager()
+      if (manager) {
+        manager.setPageBlockWindow('analytics', recentBlocks)
       }
-
-      // Process blocks for analytics
-      for (let i = 0; i < recentBlocks.length; i++) {
-        const block = recentBlocks[i]
-        
-        const blockNum = parseInt(block.number, 16)
-        const gasUsed = parseInt(block.gasUsed, 16)
-        const gasLimit = parseInt(block.gasLimit, 16)
-        const txCount = Array.isArray(block.transactions) ? block.transactions.length : 0
-        const blockSize = parseInt(block.size || '0x0', 16)
-        // Fix timestamp parsing - RETH returns timestamps that may be in milliseconds
-        const timestampValue = parseInt(block.timestamp, 16)
-        const timestamp = timestampValue > 1577836800000 ? 
-          new Date(timestampValue) : // Already milliseconds
-          new Date(timestampValue * 1000) // Convert seconds to milliseconds
-        
-        blockNumbers.push(blockNum)
-        timestamps.push(timestamp.toISOString())
-        avgGasUsed.push(gasUsed)
-        avgTxsPerBlock.push(txCount)
-        avgBlockSize.push(blockSize)
-        gasEfficiency.push((gasUsed / gasLimit) * 100)
-        
-        // Calculate block time (time since previous block)
-        if (i < recentBlocks.length - 1) {
-          const prevBlock = recentBlocks[i + 1]
-          const prevTimestampValue = parseInt(prevBlock.timestamp, 16)
-          const currentTimestampValue = parseInt(block.timestamp, 16)
-          
-          // Handle timestamps that might be in milliseconds or seconds
-          const prevTimestamp = prevTimestampValue > 1577836800000 ? prevTimestampValue : prevTimestampValue * 1000
-          const currentTimestamp = currentTimestampValue > 1577836800000 ? currentTimestampValue : currentTimestampValue * 1000
-          
-          const blockTime = Math.abs(currentTimestamp - prevTimestamp) / 1000 // seconds
-          blockTimes.push(blockTime)
-        }
-      }
-
-      // Create time-based aggregations
-      const now = new Date()
-      const aggregateByTimeframe = (minutes: number, key: '5min' | '30min' | '1hr') => {
-        const intervalMs = minutes * 60 * 1000
-        const buckets = new Map<string, { gasUsed: number[], txs: number[], efficiency: number[], blockSize: number[], count: number }>()
-        
-        for (let i = 0; i < timestamps.length; i++) {
-          const timestamp = new Date(timestamps[i])
-          const bucketTime = new Date(Math.floor(timestamp.getTime() / intervalMs) * intervalMs)
-          const bucketKey = bucketTime.toISOString()
-          
-          if (!buckets.has(bucketKey)) {
-            buckets.set(bucketKey, { gasUsed: [], txs: [], efficiency: [], blockSize: [], count: 0 })
-          }
-          
-          const bucket = buckets.get(bucketKey)!
-          bucket.gasUsed.push(avgGasUsed[i])
-          bucket.txs.push(avgTxsPerBlock[i])
-          bucket.efficiency.push(gasEfficiency[i])
-          bucket.blockSize.push(avgBlockSize[i])
-          bucket.count++
-        }
-        
-        // Convert to arrays
-        Array.from(buckets.entries())
-          .sort(([a], [b]) => a.localeCompare(b))
-          .forEach(([timestamp, bucket]) => {
-            timeframes[key].timestamps.push(timestamp)
-            timeframes[key].avgGasUsed.push(bucket.gasUsed.reduce((a, b) => a + b, 0) / bucket.gasUsed.length)
-            timeframes[key].avgTxsPerBlock.push(bucket.txs.reduce((a, b) => a + b, 0) / bucket.txs.length)
-            timeframes[key].gasEfficiency.push(bucket.efficiency.reduce((a, b) => a + b, 0) / bucket.efficiency.length)
-            timeframes[key].avgBlockSize.push(bucket.blockSize.reduce((a, b) => a + b, 0) / bucket.blockSize.length)
-          })
-      }
-
-      aggregateByTimeframe(5, '5min')
-      aggregateByTimeframe(30, '30min')
-      aggregateByTimeframe(60, '1hr')
-
-      setData({
-        blocks: recentBlocks,
-        avgGasUsed,
-        avgTxsPerBlock,
-        avgBlockSize,
-        blockNumbers,
-        timestamps,
-        gasEfficiency,
-        blockTimes,
-        timeframes
-      })
+      
+      // Process and display
+      processBlocks(recentBlocks)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load analytics data')
     } finally {
@@ -325,12 +401,19 @@ export default function AnalyticsPage() {
             <div>
               <div className="flex items-center gap-3 mb-2">
                 <h1 className="text-4xl font-bold text-white">Charts Dashboard</h1>
-                <span className="px-3 py-1 text-sm font-medium text-white bg-lime-600/20 border border-lime-500/30 rounded-full">
-                  Full Data
-                </span>
+                {isLive && (
+                  <span className="px-3 py-1 text-sm font-medium text-white bg-lime-600/20 border border-lime-500/30 rounded-full flex items-center gap-2">
+                    <div className="w-2 h-2 bg-lime-400 rounded-full animate-pulse"></div>
+                    Live
+                  </span>
+                )}
               </div>
               <p className="text-lime-200">
-                Visual analytics from {data.blocks.length} recent blocks • Live data from RETH nodes with full transaction and size data
+                Visual analytics from {data.blocks.length} recent blocks • 
+                {isLive ? ' Real-time updates active' : ' Live data from RETH nodes'}
+                {data.blocks.length > 50 && (
+                  <span className="text-lime-400"> • Extended history ({(data.blocks.length * 2 / 60).toFixed(1)} min)</span>
+                )}
               </p>
             </div>
             <div className="flex items-center gap-3">
