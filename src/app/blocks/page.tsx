@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useTransition } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { rethClient } from '@/lib/reth-client'
 import { Navigation } from '@/components/Navigation'
 import { getRealtimeManager } from '@/lib/realtime-websocket'
@@ -25,44 +25,26 @@ export default function BlocksPage() {
   const [isUpdating, setIsUpdating] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [latestBlockNumber, setLatestBlockNumber] = useState<number>(0)
-  const [isPending, startTransition] = useTransition()
   const [lastUpdateTime, setLastUpdateTime] = useState<number>(0)
   const [isMounted, setIsMounted] = useState(false)
 
-  // Smart cache loader with retry mechanism
-  const loadFromCache = async (retryCount = 0, maxRetries = 5) => {
+  // Smart cache loader - NO RETRY DELAYS, instant fallback
+  const loadFromCache = () => {
     try {
-      console.log(`🔍 [Blocks] Loading from cache (attempt ${retryCount + 1}/${maxRetries + 1})`)
       const manager = getRealtimeManager()
+      if (!manager) return false // SSR or not initialized
+      
       const cachedBlocks = manager.getCachedBlocks()
       
       if (cachedBlocks && cachedBlocks.length > 0) {
-        console.log(`🚀 [Blocks] Using ${cachedBlocks.length} cached blocks for instant load`)
-        setBlocks(cachedBlocks.slice(0, 20)) // Use first 20 blocks
-        
-        if (cachedBlocks.length > 0) {
-          const latest = parseInt(cachedBlocks[0].number, 16)
-          setLatestBlockNumber(latest)
-        }
-        
+        setBlocks(cachedBlocks.slice(0, 20))
+        setLatestBlockNumber(parseInt(cachedBlocks[0].number, 16))
         setInitialLoading(false)
-        return true // Successfully loaded from cache
-      } else {
-        console.log(`🔍 [Blocks] No cached blocks yet (attempt ${retryCount + 1}/${maxRetries + 1})`)
-        
-        // Retry if cache is empty and we haven't exceeded max retries
-        if (retryCount < maxRetries) {
-          console.log(`⏳ [Blocks] Waiting 2s before retry...`)
-          await new Promise(resolve => setTimeout(resolve, 2000))
-          return loadFromCache(retryCount + 1, maxRetries)
-        } else {
-          console.log('⚠️ [Blocks] Max retries reached, falling back to API')
-        }
+        return true
       }
       
-      return false // No cached data available
+      return false
     } catch (error) {
-      console.warn('⚠️ [Blocks] Failed to load cached data:', error)
       return false
     }
   }
@@ -70,23 +52,27 @@ export default function BlocksPage() {
   useEffect(() => {
     setIsMounted(true)
     
-    // Try cache first with retries, fallback to API
-    const initializeBlocks = async () => {
-      const cacheLoaded = await loadFromCache()
-      if (!cacheLoaded) {
-        loadBlocks()
-      }
+    // Try cache, instant API fallback
+    if (!loadFromCache()) {
+      loadBlocks()
     }
-    
-    initializeBlocks()
     
     const realtimeManager = getRealtimeManager()
     const unsubscribe = realtimeManager?.subscribe('blocks-page', (update) => {
       if (update.type === 'newBlock') {
-        console.log('🧱 [Blocks] New block received:', update.data)
         const blockNum = parseInt(update.data.number, 16)
         setLatestBlockNumber(blockNum)
-        silentUpdate(update.data)
+        
+        // Add new block to existing blocks (prepend to front)
+        setBlocks(prevBlocks => {
+          // Check if block already exists
+          const exists = prevBlocks.some(b => parseInt(b.number, 16) === blockNum)
+          if (exists) return prevBlocks
+          
+          // Prepend new block, keep 20 most recent
+          const newBlocks = [update.data, ...prevBlocks].slice(0, 20)
+          return newBlocks
+        })
       }
     })
 
@@ -107,23 +93,21 @@ export default function BlocksPage() {
     setIsUpdating(true)
     
     try {
-      startTransition(async () => {
-        const recentBlocks = await rethClient.getRecentBlocks(20)
-        
-        setBlocks(prevBlocks => {
-          // Smart merge - only update if we have new blocks
-          if (recentBlocks.length > 0 && prevBlocks.length > 0) {
-            const latestPrevBlock = prevBlocks[0]?.number ? parseInt(prevBlocks[0].number, 16) : 0
-            const latestNewBlock = parseInt(recentBlocks[0].number, 16)
-            
-            // Only update if we actually have newer blocks
-            if (latestNewBlock > latestPrevBlock) {
-              return recentBlocks
-            }
-            return prevBlocks
+      const recentBlocks = await rethClient.getRecentBlocks(20)
+      
+      setBlocks(prevBlocks => {
+        // Smart merge - only update if we have new blocks
+        if (recentBlocks.length > 0 && prevBlocks.length > 0) {
+          const latestPrevBlock = prevBlocks[0]?.number ? parseInt(prevBlocks[0].number, 16) : 0
+          const latestNewBlock = parseInt(recentBlocks[0].number, 16)
+          
+          // Only update if we actually have newer blocks
+          if (latestNewBlock > latestPrevBlock) {
+            return recentBlocks
           }
-          return recentBlocks
-        })
+          return prevBlocks
+        }
+        return recentBlocks
       })
     } catch (error) {
       console.warn('Silent blocks update failed:', error)
@@ -225,7 +209,7 @@ export default function BlocksPage() {
           </div>
         ) : (
           <div className="bg-white/5 backdrop-blur-sm shadow-lg overflow-hidden sm:rounded-md border border-lime-500/20">
-            <ul className={`divide-y divide-lime-500/10 transition-opacity duration-300 ${isPending ? 'opacity-75' : 'opacity-100'}`}>
+            <ul className={`divide-y divide-lime-500/10 transition-opacity duration-300 ${isUpdating ? 'opacity-75' : 'opacity-100'}`}>
               {blocks.map((block) => (
                 <li key={block.hash} className="px-6 py-4 hover:bg-lime-500/5">
                   <div className="flex items-center justify-between">
@@ -251,8 +235,8 @@ export default function BlocksPage() {
                           </span>
                         </div>
                         <div className="flex items-center space-x-4 mt-1 text-sm text-lime-400">
-                          <span>Validator: {block.miner.slice(0, 10)}...</span>
-                          <span>{block.transactions.length} txns</span>
+                          <span>Validator: {block.miner?.slice(0, 10)}...</span>
+                          <span>{Array.isArray(block.transactions) ? block.transactions.length : (typeof block.transactions === 'number' ? block.transactions : 0)} txns</span>
                           <span>Gas: {formatGas(block.gasUsed)}</span>
                           <span>Size: {formatBlockSize(block.size || '0x0')}</span>
                         </div>
@@ -260,7 +244,7 @@ export default function BlocksPage() {
                     </div>
                     <div className="flex items-center space-x-2">
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-lime-500/20 text-lime-300 border border-lime-500/30">
-                        {block.transactions.length} TXs
+                        {Array.isArray(block.transactions) ? block.transactions.length : (typeof block.transactions === 'number' ? block.transactions : 0)} TXs
                       </span>
                       <Link
                         href={`/block/${parseInt(block.number, 16)}`}
