@@ -10,14 +10,19 @@ export interface RealtimeUpdate {
 
 export type UpdateCallback = (update: RealtimeUpdate) => void
 
+// Debug mode - set to false for production
+const DEBUG_MODE = false
+
 class RealtimeWebSocketManager {
   private ws: WebSocket | null = null
-  // Smart caching for instant page loads
+  // Smart caching for instant page loads (ROLLING WINDOW - max 50 blocks)
   private recentBlocksCache: any[] = []
   private recentTransactionsCache: any[] = []
   private latestMempoolStats: any = {}
   private latestScheduledTxs: any[] = []
   private latestAsyncCommitments: any[] = []
+  // Per-page expanding windows (UNLIMITED - persists while user stays on page)
+  private pageBlockWindows: Map<string, any[]> = new Map()
   private reconnectAttemps = 0
   private maxReconnectAttempts = 10
   private reconnectInterval = 1000 // Start with 1 second
@@ -29,12 +34,82 @@ class RealtimeWebSocketManager {
   private lastTransactionHashes = new Set<string>()
   private mempoolCheckInterval: NodeJS.Timeout | null = null
   private blockCheckInterval: NodeJS.Timeout | null = null
+  private lastLocalStorageSave: number = 0
+  private pendingStorageSave: NodeJS.Timeout | null = null
+  
+  private log(...args: any[]) {
+    if (DEBUG_MODE) console.log(...args)
+  }
+  
+  private logImportant(...args: any[]) {
+    // Always log important events (errors, connections)
+    console.log(...args)
+  }
 
   constructor() {
     if (typeof window !== 'undefined') {
       this.connectionId = `conn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+      
+      this.logImportant(`🚀 [${this.connectionId}] WebSocket manager starting...`)
+      
+      // Try to restore cache from localStorage (survives page refresh)
+      this.restoreCacheFromStorage()
+      
+      // START IMMEDIATELY - cache builds in background regardless of page
       this.startConnection()
       this.startHighFrequencyPolling()
+    }
+  }
+  
+  private restoreCacheFromStorage() {
+    try {
+      const stored = localStorage.getItem('ritual-scan-cache')
+      if (stored) {
+        const data = JSON.parse(stored)
+        const age = Date.now() - data.timestamp
+        
+        // Use cache if less than 30 seconds old
+        if (age < 30000 && data.blocks && Array.isArray(data.blocks)) {
+          this.recentBlocksCache = data.blocks
+          this.log(`💾 [${this.connectionId}] Restored ${data.blocks.length} blocks from localStorage (age: ${(age/1000).toFixed(1)}s)`)
+        } else {
+          this.log(`⏰ [${this.connectionId}] localStorage cache too old (${(age/1000).toFixed(1)}s), discarding`)
+        }
+      }
+    } catch (error) {
+      console.warn(`⚠️  [${this.connectionId}] Failed to restore cache from localStorage:`, error)
+    }
+  }
+  
+  private saveCacheToStorage() {
+    // Debounce: Only save once every 5 seconds to avoid blocking main thread
+    const now = Date.now()
+    if (now - this.lastLocalStorageSave < 5000) {
+      // Schedule save for later if not already scheduled
+      if (!this.pendingStorageSave) {
+        this.pendingStorageSave = setTimeout(() => {
+          this.pendingStorageSave = null
+          this.saveCacheToStorageNow()
+        }, 5000 - (now - this.lastLocalStorageSave))
+      }
+      return
+    }
+    
+    this.saveCacheToStorageNow()
+  }
+  
+  private saveCacheToStorageNow() {
+    try {
+      if (this.recentBlocksCache.length > 0) {
+        const data = {
+          blocks: this.recentBlocksCache,
+          timestamp: Date.now()
+        }
+        localStorage.setItem('ritual-scan-cache', JSON.stringify(data))
+        this.lastLocalStorageSave = Date.now()
+      }
+    } catch (error) {
+      // Silently fail - localStorage might be full or disabled
     }
   }
 
@@ -54,11 +129,11 @@ class RealtimeWebSocketManager {
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
         const host = window.location.host
         wsUrl = `${protocol}//${host}/api/ws-proxy?id=${this.connectionId}`
-        console.log(`🔗 [${this.connectionId}] Using WebSocket proxy for HTTPS: ${wsUrl}`)
+        this.log(`🔗 [${this.connectionId}] Using WebSocket proxy for HTTPS: ${wsUrl}`)
       } else {
         // Direct connection for HTTP or server-side
         wsUrl = process.env.NEXT_PUBLIC_RETH_WS_URL || 'ws://35.196.101.134:8546'
-        console.log(`🔗 [${this.connectionId}] Direct WebSocket connection to: ${wsUrl}`)
+        this.log(`🔗 [${this.connectionId}] Direct WebSocket connection to: ${wsUrl}`)
       }
       
       this.ws = new WebSocket(wsUrl)
@@ -87,7 +162,7 @@ class RealtimeWebSocketManager {
         } catch (error) {
           // Only log JSON parse errors if they're not related to RETH optimized mode responses
           if (event.data && event.data.includes('not supported in optimized mode')) {
-            console.log(`📡 [${this.connectionId}] RETH optimized mode response (expected)`)
+            this.log(`📡 [${this.connectionId}] RETH optimized mode response (expected)`)
           } else {
             console.error(`❌ [${this.connectionId}] WebSocket JSON parse error:`, error)
             console.error(`❌ [${this.connectionId}] Raw message that failed:`, event.data)
@@ -134,7 +209,7 @@ class RealtimeWebSocketManager {
         id: 2
       }
 
-      console.log(`📡 [${this.connectionId}] Subscribing to new block headers and pending transactions`)
+      this.log(`📡 [${this.connectionId}] Subscribing to new block headers and pending transactions`)
       this.ws.send(JSON.stringify(blockSubscription))
       this.ws.send(JSON.stringify(pendingTxSubscription))
     } catch (error) {
@@ -151,7 +226,7 @@ class RealtimeWebSocketManager {
       const error = message.params.error
       if (error.message?.includes('not supported in optimized mode')) {
         // This is expected - RETH optimized mode doesn't support some subscriptions 
-        console.log(`📡 [${this.connectionId}] RETH optimized mode - subscription not supported (expected)`)
+        this.log(`📡 [${this.connectionId}] RETH optimized mode - subscription not supported (expected)`)
         return
       }
       console.warn(`⚠️ [${this.connectionId}] Subscription error:`, error)
@@ -161,7 +236,7 @@ class RealtimeWebSocketManager {
     // Handle JSON-RPC errors
     if (message.error) {
       if (message.error.message?.includes('not supported in optimized mode')) {
-        console.log(`📡 [${this.connectionId}] RETH optimized mode - method not supported (expected)`)
+        this.log(`📡 [${this.connectionId}] RETH optimized mode - method not supported (expected)`)
         return
       }
       console.warn(`⚠️ [${this.connectionId}] RPC error:`, message.error)
@@ -171,8 +246,6 @@ class RealtimeWebSocketManager {
     if (message.method === 'eth_subscription') {
       const subscription = message.params?.subscription
       const result = message.params?.result
-
-      console.log(`🔍 [DEBUG] Subscription message - ID: ${subscription}, result type: ${typeof result}`)
       
       if (!subscription) {
         console.warn(`⚠️ [${this.connectionId}] Subscription message without subscription ID:`, message)
@@ -191,28 +264,24 @@ class RealtimeWebSocketManager {
 
       if (isBlockHeader) {
         // This is a block header from newHeads subscription
-        console.log(`🔍 [DEBUG] Identified as block header, calling handleNewBlock`)
-        console.log(`🔍 [DEBUG] Block data:`, JSON.stringify(result, null, 2))
         this.handleNewBlock(result)
       } else if (typeof result === 'string' && result.startsWith('0x')) {
         // This is a pending transaction hash
-        console.log(`🔍 [DEBUG] Identified as pending transaction: ${result.slice(0,10)}...`)
         this.handleNewPendingTransaction(result)
       } else {
-        console.log(`📩 [${this.connectionId}] Unknown subscription result:`, result)
-        console.log(`🔍 [DEBUG] Result object keys:`, result ? Object.keys(result) : 'null')
-        console.log(`🔍 [DEBUG] Full result object:`, JSON.stringify(result, null, 2))
+        // Only log unknown messages for debugging
+        this.log(`📩 [${this.connectionId}] Unknown subscription result:`, result ? Object.keys(result) : 'null')
       }
     } else if (message.id && message.result) {
-      console.log(`📩 [${this.connectionId}] Subscription confirmed:`, message.result)
+      this.log(`📩 [${this.connectionId}] Subscription confirmed:`, message.result)
     } else if (message.id && message.error) {
       console.warn(`⚠️ [${this.connectionId}] RPC method error:`, message.error)
       // If subscriptions are not supported, fall back to polling only
       if (message.error.message?.includes('not supported')) {
-        console.log(`📡 [${this.connectionId}] WebSocket subscriptions not supported, using polling only`)
+        this.log(`📡 [${this.connectionId}] WebSocket subscriptions not supported, using polling only`)
       }
     } else {
-      console.log(`📩 [${this.connectionId}] Unhandled message:`, message)
+      this.log(`📩 [${this.connectionId}] Unhandled message:`, message)
     }
   }
 
@@ -237,7 +306,7 @@ class RealtimeWebSocketManager {
       }
       
       if (blockNumber > this.lastBlockNumber) {
-        console.log(`🔗 [${this.connectionId}] New block #${blockNumber}`)
+        this.log(`🔗 [${this.connectionId}] New block #${blockNumber}`)
         this.lastBlockNumber = blockNumber
 
         // Enhanced block update with gas price (Tier 1 feature)
@@ -256,9 +325,13 @@ class RealtimeWebSocketManager {
           this.recentBlocksCache = this.recentBlocksCache.slice(0, 50)
         }
         
-        console.log(`📦 [${this.connectionId}] Cache updated: ${this.recentBlocksCache.length} blocks cached`)
-        console.log(`📦 [${this.connectionId}] First 3 cached block numbers:`, 
-          this.recentBlocksCache.slice(0, 3).map(b => parseInt(b.number, 16)))
+        // Reduce logging spam - only log every 5th block
+        if (this.recentBlocksCache.length % 5 === 0) {
+          this.log(`📦 [${this.connectionId}] Cache: ${this.recentBlocksCache.length} blocks (latest: #${blockNumber})`)
+        }
+        
+        // Save to localStorage for persistence across page reloads (debounced to every 5s)
+        this.saveCacheToStorage()
         
         // **FIX**: Notify subscribers that cache is now available (first block)
         if (this.recentBlocksCache.length === 1) {
@@ -293,7 +366,7 @@ class RealtimeWebSocketManager {
           if (blockHash) {
             const fullBlock = await rethClient.getBlock(blockHash, true)
             if (fullBlock && fullBlock.transactions && Array.isArray(fullBlock.transactions)) {
-              console.log(`📦 [${this.connectionId}] Block #${blockNumber} has ${fullBlock.transactions.length} transactions`)
+              this.log(`📦 [${this.connectionId}] Block #${blockNumber} has ${fullBlock.transactions.length} transactions`)
               
               // Emit transaction updates for each transaction in the block
               for (const txHash of fullBlock.transactions) {
@@ -315,7 +388,7 @@ class RealtimeWebSocketManager {
 
   private handleNewTransaction(txHash: string) {
     if (!this.lastTransactionHashes.has(txHash)) {
-      console.log(`💸 [${this.connectionId}] New transaction: ${txHash.slice(0, 10)}...`)
+      this.log(`💸 [${this.connectionId}] New transaction: ${txHash.slice(0, 10)}...`)
       this.lastTransactionHashes.add(txHash)
 
       // Keep only last 1000 transaction hashes to prevent memory leaks
@@ -339,7 +412,10 @@ class RealtimeWebSocketManager {
   // Tier 1: Handle pending transactions from WebSocket subscription
   private handleNewPendingTransaction(txHash: string) {
     if (!this.lastTransactionHashes.has(txHash)) {
-      console.log(`⚡ [${this.connectionId}] New pending transaction: ${txHash.slice(0, 10)}...`)
+      // Reduce logging - only log every 10th transaction
+      if (this.lastTransactionHashes.size % 10 === 0) {
+        this.log(`⚡ [${this.connectionId}] Pending txs: ${this.lastTransactionHashes.size}`)
+      }
       this.lastTransactionHashes.add(txHash)
 
       // Keep only last 1000 transaction hashes to prevent memory leaks
@@ -373,7 +449,7 @@ class RealtimeWebSocketManager {
         this.latestMempoolStats = mempoolStats
         this.latestScheduledTxs = scheduledTxs
         
-        console.log(`📦 [${this.connectionId}] Cache updated: mempool + ${scheduledTxs?.length || 0} scheduled txs`)
+        this.log(`📦 [${this.connectionId}] Cache updated: mempool + ${scheduledTxs?.length || 0} scheduled txs`)
 
         const mempoolUpdate: RealtimeUpdate = {
           type: 'mempoolUpdate',
@@ -429,7 +505,7 @@ class RealtimeWebSocketManager {
 
     this.reconnectAttemps++
     
-    console.log(`🔄 [${this.connectionId}] Scheduling reconnect attempt ${this.reconnectAttemps}/${this.maxReconnectAttempts} in ${this.reconnectInterval}ms`)
+    this.log(`🔄 [${this.connectionId}] Scheduling reconnect attempt ${this.reconnectAttemps}/${this.maxReconnectAttempts} in ${this.reconnectInterval}ms`)
 
     setTimeout(() => {
       this.startConnection()
@@ -444,19 +520,22 @@ class RealtimeWebSocketManager {
 
   // Public API
   subscribe(callbackId: string, callback: UpdateCallback): () => void {
-    console.log(`📻 [${this.connectionId}] New subscriber: ${callbackId}`)
+    this.log(`📻 [${this.connectionId}] New subscriber: ${callbackId}`)
     this.callbacks.set(callbackId, callback)
 
     // Return unsubscribe function
     return () => {
-      console.log(`📻 [${this.connectionId}] Unsubscribing: ${callbackId}`)
+      this.log(`📻 [${this.connectionId}] Unsubscribing: ${callbackId}`)
       this.callbacks.delete(callbackId)
     }
   }
 
   // **CRITICAL FIX**: Add cache access methods
   getCachedBlocks(): any[] {
-    console.log(`🔍 [${this.connectionId}] getCachedBlocks called - returning ${this.recentBlocksCache.length} blocks`)
+    // Reduce logging spam - only log when cache is empty or has significant size
+    if (this.recentBlocksCache.length === 0 || this.recentBlocksCache.length % 10 === 0) {
+      console.log(`🔍 [${this.connectionId}] getCachedBlocks called - returning ${this.recentBlocksCache.length} blocks`)
+    }
     return [...this.recentBlocksCache] // Return copy to prevent mutation
   }
 
@@ -466,6 +545,36 @@ class RealtimeWebSocketManager {
 
   getCachedMempoolStats(): any {
     return { ...this.latestMempoolStats }
+  }
+
+  // Per-page expanding window management
+  getPageBlockWindow(pageId: string): any[] {
+    return this.pageBlockWindows.get(pageId) || []
+  }
+
+  setPageBlockWindow(pageId: string, blocks: any[]) {
+    this.pageBlockWindows.set(pageId, blocks)
+    this.log(`📊 [${this.connectionId}] Page '${pageId}' window: ${blocks.length} blocks`)
+  }
+
+  addBlockToPageWindow(pageId: string, block: any) {
+    const currentWindow = this.pageBlockWindows.get(pageId) || []
+    const blockNumber = parseInt(block.number || block.blockNumber, 16)
+    
+    // Don't add if already exists
+    if (currentWindow.some((b: any) => parseInt(b.number, 16) === blockNumber)) {
+      return
+    }
+    
+    // Add to front (newest first)
+    currentWindow.unshift(block)
+    this.pageBlockWindows.set(pageId, currentWindow)
+    this.log(`➕ [${this.connectionId}] Added block #${blockNumber} to '${pageId}' window (total: ${currentWindow.length})`)
+  }
+
+  clearPageBlockWindow(pageId: string) {
+    this.pageBlockWindows.delete(pageId)
+    this.log(`🗑️ [${this.connectionId}] Cleared '${pageId}' window`)
   }
 
   getConnectionStatus() {
@@ -532,7 +641,7 @@ class RealtimeWebSocketManager {
 
   // Force refresh specific data types
   async forceRefresh(type: 'mempool' | 'scheduled' | 'blocks') {
-    console.log(`🔄 [${this.connectionId}] Force refreshing ${type}`)
+    this.log(`🔄 [${this.connectionId}] Force refreshing ${type}`)
     
     try {
       switch (type) {
@@ -567,14 +676,25 @@ class RealtimeWebSocketManager {
   }
 }
 
-// Global singleton instance
-let realtimeManager: RealtimeWebSocketManager | null = null
-
-export function getRealtimeManager(): RealtimeWebSocketManager {
-  if (!realtimeManager && typeof window !== 'undefined') {
-    realtimeManager = new RealtimeWebSocketManager()
+// Global singleton instance - stored in window to persist across Next.js navigations
+declare global {
+  interface Window {
+    __realtimeManager?: RealtimeWebSocketManager
   }
-  return realtimeManager!
+}
+
+export function getRealtimeManager(): RealtimeWebSocketManager | null {
+  // Handle SSR gracefully - return null during server-side rendering
+  if (typeof window === 'undefined') {
+    return null as any // SSR - no WebSocket manager
+  }
+  
+  // Check window first (persists across Next.js navigations)
+  if (!window.__realtimeManager) {
+    window.__realtimeManager = new RealtimeWebSocketManager()
+  }
+  
+  return window.__realtimeManager
 }
 
 export function useRealtime(callbackId: string, callback: UpdateCallback) {
@@ -584,8 +704,8 @@ export function useRealtime(callbackId: string, callback: UpdateCallback) {
 
 // Debug utilities - accessible from browser console
 export function debugWebSocketCache() {
-  if (realtimeManager) {
-    return realtimeManager.debugCacheState()
+  if (typeof window !== 'undefined' && window.__realtimeManager) {
+    return window.__realtimeManager.debugCacheState()
   } else {
     console.error('❌ No realtime manager instance found')
     return null
@@ -599,8 +719,8 @@ if (typeof window !== 'undefined') {
   
   // Cleanup on page unload
   window.addEventListener('beforeunload', () => {
-    if (realtimeManager) {
-      realtimeManager.disconnect()
+    if (window.__realtimeManager) {
+      window.__realtimeManager.disconnect()
     }
   })
 }
