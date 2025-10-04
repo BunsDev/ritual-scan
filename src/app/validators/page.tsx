@@ -109,8 +109,6 @@ export default function ValidatorsPage() {
             healthStatus = 'warning'
           }
           // else: healthStatus remains 'active'
-          
-          console.log(`📊 [Validator ${address.slice(0, 10)}] p=${p.toFixed(4)}, mean=${mean.toFixed(1)}, warn=${warningThreshold.toFixed(1)}, inactive=${inactiveThreshold.toFixed(1)}, actual=${blocksSinceLastProposal}`)
         }
       }
       // If < 30 blocks, keep all as 'active' (insufficient data)
