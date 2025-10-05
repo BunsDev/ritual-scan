@@ -178,10 +178,20 @@ class RealtimeWebSocketManager {
       
       let wsUrl: string
       if (isBrowser && isHttps) {
-        // HTTPS deployment - use wss:// via Caddy proxy at /rpc-ws
-        // Caddy proxy accepts wss:// and forwards to ws://RPC_NODE
-        wsUrl = `wss://${host}/rpc-ws`
-        this.logImportant(`🔗 [${this.connectionId}] HTTPS - Caddy WebSocket proxy: ${wsUrl}`)
+        // HTTPS deployment - use dedicated WebSocket subdomain
+        if (host.includes('ding.fish')) {
+          // Production: wss://ws.ding.fish (separate LoadBalancer)
+          wsUrl = 'wss://ws.ding.fish/'
+          this.logImportant(`🔗 [${this.connectionId}] Production HTTPS - WebSocket subdomain: ${wsUrl}`)
+        } else if (host.includes('localhost')) {
+          // Local: wss://localhost/rpc-ws (Caddy path-based proxy)
+          wsUrl = `wss://${host}/rpc-ws`
+          this.logImportant(`🔗 [${this.connectionId}] Local HTTPS - Caddy proxy: ${wsUrl}`)
+        } else {
+          // Fallback
+          wsUrl = `wss://${host}/rpc-ws`
+          this.logImportant(`🔗 [${this.connectionId}] HTTPS - Fallback proxy path: ${wsUrl}`)
+        }
       } else {
         // HTTP deployment - direct ws:// connection
         wsUrl = process.env.NEXT_PUBLIC_RETH_WS_URL || 'ws://35.196.101.134:8546'

@@ -1,0 +1,78 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: ritual-explorer-gateway
+  annotations:
+    networking.gke.io/certmap: ding-fish-certmap
+spec:
+  gatewayClassName: gke-l7-global-external-managed
+  listeners:
+  - name: https
+    protocol: HTTPS
+    port: 443
+    allowedRoutes:
+      namespaces:
+        from: Same
+  - name: http
+    protocol: HTTP
+    port: 80
+    allowedRoutes:
+      namespaces:
+        from: Same
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: ritual-explorer-route
+spec:
+  parentRefs:
+  - name: ritual-explorer-gateway
+  hostnames:
+  - "ding.fish"
+  - "www.ding.fish"
+  rules:
+  # WebSocket route - use HTTP/1.1 backend
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /rpc-ws
+    backendRefs:
+    - name: caddy-ws-proxy-service
+      port: 8546
+  # Main app route
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /
+    backendRefs:
+    - name: ritual-explorer-service
+      port: 80
+---
+apiVersion: networking.gke.io/v1
+kind: GCPBackendPolicy  
+metadata:
+  name: websocket-backend-policy
+spec:
+  default:
+    timeoutSec: 86400
+    connectionDraining:
+      drainingTimeoutSec: 60
+  targetRef:
+    group: ""
+    kind: Service
+    name: caddy-ws-proxy-service
+---
+apiVersion: networking.gke.io/v1
+kind: GCPBackendPolicy
+metadata:
+  name: app-backend-policy
+spec:
+  default:
+    timeoutSec: 30
+    connectionDraining:
+      drainingTimeoutSec: 30
+  targetRef:
+    group: ""
+    kind: Service
+    name: ritual-explorer-service
+

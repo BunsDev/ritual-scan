@@ -4,8 +4,11 @@ metadata:
   name: caddy-ws-proxy-config
 data:
   Caddyfile: |
-    :8546 {
-        # Proxy WebSocket requests to RPC node
+    # WebSocket proxy on port 443 (accepts any host/IP)
+    :443 {
+        tls internal
+        
+        # Proxy all WebSocket requests to RPC node
         reverse_proxy 35.196.101.134:8546 {
             header_up Host {upstream_hostport}
             header_up Upgrade {http.request.header.Upgrade}
@@ -31,6 +34,8 @@ spec:
       - name: caddy
         image: caddy:2-alpine
         ports:
+        - containerPort: 443
+          name: https
         - containerPort: 8546
           name: websocket
         volumeMounts:
@@ -46,9 +51,14 @@ spec:
             cpu: "200m"
         livenessProbe:
           tcpSocket:
-            port: 8546
+            port: 443
           initialDelaySeconds: 5
           periodSeconds: 10
+        readinessProbe:
+          tcpSocket:
+            port: 443
+          initialDelaySeconds: 3
+          periodSeconds: 5
       volumes:
       - name: caddy-config
         configMap:
@@ -78,4 +88,9 @@ spec:
   timeoutSec: 86400  # 24 hours for WebSocket connections
   connectionDraining:
     drainingTimeoutSec: 60
+  # Force HTTP/1.1 for WebSocket support (HTTP/2 doesn't support Upgrade header)
+  customRequestHeaders:
+    headers:
+    - "Connection:Upgrade"
+    - "Upgrade:websocket"
 
