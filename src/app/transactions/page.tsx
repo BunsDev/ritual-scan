@@ -33,6 +33,8 @@ export default function TransactionsPage() {
   const loadFromCache = () => {
     try {
       const manager = getRealtimeManager()
+      if (!manager) return false
+      
       const cachedBlocks = manager.getCachedBlocks()
       const cachedTransactions: Transaction[] = [] // Note: recentTransactionsCache not implemented yet
       
