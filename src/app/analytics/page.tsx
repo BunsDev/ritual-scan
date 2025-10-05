@@ -223,6 +223,8 @@ export default function AnalyticsPage() {
       const manager = getRealtimeManager()
       if (manager) {
         manager.addBlockToPageWindow('analytics', fullBlock)
+        const windowSize = manager.getPageBlockWindow('analytics').length
+        console.log(`  Per-page window now has ${windowSize} blocks`)
       }
       
       // Reprocess all blocks and update charts
@@ -269,9 +271,19 @@ export default function AnalyticsPage() {
       let recentBlocks: any[] = []
       let source: 'cache' | 'api' = 'api'
       
+      // DEBUG: Check what's in the manager
+      if (manager) {
+        const status = manager.getConnectionStatus()
+        console.log(`📊 [Analytics] Manager status:`, status)
+      } else {
+        console.log(`📊 [Analytics] No manager available (SSR?)`)
+      }
+      
       // PHASE 3: Check if we have accumulated data from previous visit
       if (manager) {
         const pageWindowBlocks = manager.getPageBlockWindow('analytics')
+        console.log(`📊 [Analytics] Checking per-page window: found ${pageWindowBlocks.length} blocks`)
+        
         if (pageWindowBlocks.length > 0) {
           // User returning - use accumulated data!
           console.log(`📊 [Analytics] Found ${pageWindowBlocks.length} accumulated blocks from previous session!`)
@@ -309,9 +321,15 @@ export default function AnalyticsPage() {
       blocksDataRef.current = recentBlocks
       latestBlockRef.current = parseInt(recentBlocks[0].number, 16)
       
-      if (manager && source === 'api') {
-        // Only set if we fetched from API (cache already has it)
-        manager.setPageBlockWindow('analytics', recentBlocks)
+      if (manager) {
+        if (source === 'api') {
+          // Only set if we fetched from API (cache already has it)
+          manager.setPageBlockWindow('analytics', recentBlocks)
+          console.log(`📊 [Analytics] Saved ${recentBlocks.length} blocks to per-page window`)
+        }
+        // Verify it's saved
+        const savedBlocks = manager.getPageBlockWindow('analytics')
+        console.log(`📊 [Analytics] Per-page window verification: ${savedBlocks.length} blocks stored`)
       }
       
       // Process and display
