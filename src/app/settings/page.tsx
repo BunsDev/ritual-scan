@@ -209,7 +209,7 @@ export default function SettingsPage() {
           </p>
         </div>
 
-        <div className="grid gap-8 lg:grid-cols-2">
+        <div className="max-w-3xl mx-auto">
           {/* Current Configuration */}
           <div className="bg-black/20 backdrop-blur-sm shadow-lg overflow-hidden rounded-lg border border-lime-800/30">
             <div className="px-6 py-4 border-b border-lime-800/30">
@@ -328,55 +328,6 @@ export default function SettingsPage() {
                     <span className="text-sm">✅ Saved!</span>
                   </div>
                 )}
-              </div>
-            </div>
-          </div>
-
-          {/* Presets */}
-          <div className="bg-black/20 backdrop-blur-sm shadow-lg overflow-hidden rounded-lg border border-lime-800/30">
-            <div className="px-6 py-4 border-b border-lime-800/30">
-              <h3 className="text-lg font-medium text-white">Configuration Presets</h3>
-              <p className="text-lime-300 text-sm">Quick setup for common networks</p>
-            </div>
-            
-            <div className="p-6">
-              <div className="space-y-4">
-                {presets.map((preset, index) => (
-                  <div 
-                    key={index}
-                    className="p-4 bg-lime-900/10 border border-lime-700/30 rounded-lg hover:bg-lime-900/20 transition-colors"
-                  >
-                    <div className="flex justify-between items-start mb-2">
-                      <h4 className="font-medium text-white">{preset.name}</h4>
-                      <button
-                        onClick={() => loadPreset(preset)}
-                        className="px-3 py-1 text-xs bg-lime-600 text-white rounded hover:bg-lime-700 transition-colors"
-                      >
-                        Load
-                      </button>
-                    </div>
-                    <div className="space-y-1 text-sm text-lime-300">
-                      <div><span className="text-lime-400">Primary:</span> {preset.primary}</div>
-                      {preset.backup && <div><span className="text-lime-400">Backup:</span> {preset.backup}</div>}
-                      {preset.websocket && <div><span className="text-lime-400">WebSocket:</span> {preset.websocket}</div>}
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="mt-6 p-4 bg-yellow-900/20 border border-yellow-600/30 rounded-lg">
-                <div className="flex items-start space-x-2">
-                  <span className="text-yellow-400 text-sm">⚠️</span>
-                  <div className="text-yellow-300 text-sm">
-                    <p className="font-medium">Important Notes:</p>
-                    <ul className="mt-1 space-y-1 text-xs">
-                      <li>• Changes take effect immediately</li>
-                      <li>• WebSocket connection will be re-established</li>
-                      <li>• Test connections before saving</li>
-                      <li>• Settings are saved in browser localStorage</li>
-                    </ul>
-                  </div>
-                </div>
               </div>
             </div>
           </div>
