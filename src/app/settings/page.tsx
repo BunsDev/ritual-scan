@@ -37,8 +37,25 @@ export default function SettingsPage() {
   ])
 
   useEffect(() => {
-    const currentConfig = rethClient.getConfiguration()
-    setConfig(currentConfig)
+    // Check if we just reloaded after RPC change (config in sessionStorage)
+    const savedConfig = sessionStorage.getItem('ritual-scan-new-rpc-config')
+    if (savedConfig) {
+      try {
+        const restoredConfig = JSON.parse(savedConfig)
+        console.log('🔄 Restoring RPC config after cache clear:', restoredConfig)
+        rethClient.updateConfiguration(restoredConfig)
+        setConfig(restoredConfig)
+        // Clear the temp storage
+        sessionStorage.removeItem('ritual-scan-new-rpc-config')
+        console.log('✅ RPC config restored and applied')
+      } catch (e) {
+        console.warn('Failed to restore config:', e)
+      }
+    } else {
+      // Normal load - get current config
+      const currentConfig = rethClient.getConfiguration()
+      setConfig(currentConfig)
+    }
 
     const unsubscribe = rethClient.onConfigurationChange((newConfig) => {
       setConfig(newConfig)
@@ -84,14 +101,18 @@ export default function SettingsPage() {
       if (rpcChanged) {
         console.log('🔄 RPC configuration changed - PURGING ALL CACHES...')
         
-        // Step 1: Disconnect and destroy WebSocket manager FIRST
+        // Step 1: SAVE new config to sessionStorage (survives localStorage.clear)
+        sessionStorage.setItem('ritual-scan-new-rpc-config', JSON.stringify(config))
+        console.log('  ✓ Saved new RPC config to sessionStorage')
+        
+        // Step 2: Disconnect and destroy WebSocket manager
         const manager = getRealtimeManager()
         if (manager) {
           manager.disconnect()
           console.log('  ✓ Disconnected WebSocket')
         }
         
-        // Step 2: Delete singleton instance (critical!)
+        // Step 3: Delete singleton instance (critical!)
         if (typeof window !== 'undefined') {
           if ((window as any).__realtimeManager) {
             delete (window as any).__realtimeManager
@@ -99,7 +120,7 @@ export default function SettingsPage() {
           }
         }
         
-        // Step 3: NUKE ALL localStorage
+        // Step 4: NUKE ALL localStorage (cache data gone, but config saved in session)
         try {
           localStorage.clear()
           console.log('  ✓ Cleared ALL localStorage')
@@ -107,15 +128,7 @@ export default function SettingsPage() {
           console.warn('  ⚠️ Could not clear localStorage:', e)
         }
         
-        // Step 4: NUKE sessionStorage
-        try {
-          sessionStorage.clear()
-          console.log('  ✓ Cleared sessionStorage')
-        } catch (e) {
-          console.warn('  ⚠️ Could not clear sessionStorage:', e)
-        }
-        
-        // Step 5: Clear Next.js cache if possible
+        // Step 5: Clear Next.js service worker caches
         if ('caches' in window) {
           caches.keys().then(names => {
             names.forEach(name => {
@@ -125,9 +138,9 @@ export default function SettingsPage() {
           })
         }
         
-        // Step 6: HARD reload with cache bypass (like Ctrl+Shift+R)
+        // Step 6: HARD reload with cache bypass
         console.log('🔄 HARD RELOAD in 1 second...')
-        console.log('💥 ALL CACHES NUKED - Starting fresh!')
+        console.log('💥 ALL CACHES NUKED - RPC config will be restored on load!')
         setTimeout(() => {
           // Hard reload bypassing cache
           window.location.href = window.location.href.split('?')[0] + '?t=' + Date.now()
