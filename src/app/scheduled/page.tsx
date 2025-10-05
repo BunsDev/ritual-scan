@@ -39,6 +39,8 @@ export default function ScheduledPage() {
   const loadFromCache = () => {
     try {
       const manager = getRealtimeManager()
+      if (!manager) return false
+      
       const cachedScheduled = manager.getCachedScheduledTxs()
       
       if (cachedScheduled && cachedScheduled.length > 0) {
