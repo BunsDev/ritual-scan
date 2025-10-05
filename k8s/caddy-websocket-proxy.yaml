@@ -1,0 +1,81 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: caddy-ws-proxy-config
+data:
+  Caddyfile: |
+    :8546 {
+        # Proxy WebSocket requests to RPC node
+        reverse_proxy 35.196.101.134:8546 {
+            header_up Host {upstream_hostport}
+            header_up Upgrade {http.request.header.Upgrade}
+            header_up Connection {http.request.header.Connection}
+        }
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: caddy-ws-proxy
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: caddy-ws-proxy
+  template:
+    metadata:
+      labels:
+        app: caddy-ws-proxy
+    spec:
+      containers:
+      - name: caddy
+        image: caddy:2-alpine
+        ports:
+        - containerPort: 8546
+          name: websocket
+        volumeMounts:
+        - name: caddy-config
+          mountPath: /etc/caddy/Caddyfile
+          subPath: Caddyfile
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        livenessProbe:
+          tcpSocket:
+            port: 8546
+          initialDelaySeconds: 5
+          periodSeconds: 10
+      volumes:
+      - name: caddy-config
+        configMap:
+          name: caddy-ws-proxy-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: caddy-ws-proxy-service
+  annotations:
+    cloud.google.com/backend-config: '{"default": "ws-proxy-backend-config"}'
+spec:
+  type: ClusterIP
+  selector:
+    app: caddy-ws-proxy
+  ports:
+  - name: websocket
+    port: 8546
+    targetPort: 8546
+    protocol: TCP
+---
+apiVersion: cloud.google.com/v1
+kind: BackendConfig
+metadata:
+  name: ws-proxy-backend-config
+spec:
+  timeoutSec: 86400  # 24 hours for WebSocket connections
+  connectionDraining:
+    drainingTimeoutSec: 60
+

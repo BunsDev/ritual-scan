@@ -1,0 +1,73 @@
+apiVersion: networking.gke.io/v1
+kind: ManagedCertificate
+metadata:
+  name: ding-fish-cert
+spec:
+  domains:
+    - ding.fish
+    - www.ding.fish
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ritual-explorer-https-ingress
+  annotations:
+    kubernetes.io/ingress.class: "gce"
+    kubernetes.io/ingress.global-static-ip-name: "ritual-explorer-ip"
+    networking.gke.io/managed-certificates: "ding-fish-cert"
+    kubernetes.io/ingress.allow-http: "true"
+    # Enable WebSocket support
+    cloud.google.com/backend-config: "ritual-explorer-backend-config"
+spec:
+  rules:
+  - host: ding.fish
+    http:
+      paths:
+      - path: /rpc-ws
+        pathType: Prefix
+        backend:
+          service:
+            name: caddy-ws-proxy-service
+            port:
+              number: 8546
+      - path: /*
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: ritual-explorer-service
+            port:
+              number: 80
+  - host: www.ding.fish
+    http:
+      paths:
+      - path: /rpc-ws
+        pathType: Prefix
+        backend:
+          service:
+            name: caddy-ws-proxy-service
+            port:
+              number: 8546
+      - path: /*
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: ritual-explorer-service
+            port:
+              number: 80
+---
+apiVersion: cloud.google.com/v1
+kind: BackendConfig
+metadata:
+  name: ritual-explorer-backend-config
+spec:
+  timeoutSec: 86400  # 24 hours for WebSocket connections
+  connectionDraining:
+    drainingTimeoutSec: 60
+  healthCheck:
+    checkIntervalSec: 10
+    timeoutSec: 5
+    healthyThreshold: 2
+    unhealthyThreshold: 3
+    type: HTTP
+    requestPath: /api/health
+    port: 3000

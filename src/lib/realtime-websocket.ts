@@ -174,19 +174,18 @@ class RealtimeWebSocketManager {
       // Determine WebSocket URL based on environment
       const isBrowser = typeof window !== 'undefined'
       const isHttps = isBrowser && window.location.protocol === 'https:'
+      const host = isBrowser ? window.location.host : ''
       
       let wsUrl: string
       if (isBrowser && isHttps) {
-        // Use Caddy WebSocket proxy for HTTPS sites (avoids mixed content errors)
-        // Caddy proxies wss://host/rpc-ws → ws://RPC_NODE:8546
-        const protocol = 'wss:'
-        const host = window.location.host
-        wsUrl = `${protocol}//${host}/rpc-ws`
-        this.logImportant(`🔗 [${this.connectionId}] Using Caddy WebSocket proxy: ${wsUrl}`)
+        // HTTPS deployment - use wss:// via Caddy proxy at /rpc-ws
+        // Caddy proxy accepts wss:// and forwards to ws://RPC_NODE
+        wsUrl = `wss://${host}/rpc-ws`
+        this.logImportant(`🔗 [${this.connectionId}] HTTPS - Caddy WebSocket proxy: ${wsUrl}`)
       } else {
-        // Direct connection for HTTP or server-side
+        // HTTP deployment - direct ws:// connection
         wsUrl = process.env.NEXT_PUBLIC_RETH_WS_URL || 'ws://35.196.101.134:8546'
-        this.log(`🔗 [${this.connectionId}] Direct WebSocket connection to: ${wsUrl}`)
+        this.log(`🔗 [${this.connectionId}] HTTP - Direct WebSocket: ${wsUrl}`)
       }
       
       this.ws = new WebSocket(wsUrl)
