@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { rethClient, RitualTransactionType } from '@/lib/reth-client'
 import { Navigation } from '@/components/Navigation'
+import { getRealtimeManager } from '@/lib/realtime-websocket'
 import Link from 'next/link'
 import { useParticleBackground } from '@/hooks/useParticleBackground'
 
@@ -34,28 +35,172 @@ export default function RitualAnalyticsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [timeRange, setTimeRange] = useState<'1h' | '6h' | '24h' | '7d'>('24h')
+  const [isLive, setIsLive] = useState(false)
+  const [dataSource, setDataSource] = useState<'cache' | 'api' | null>(null)
+  const [lastUpdateTime, setLastUpdateTime] = useState<Date | null>(null)
+  
+  // Refs for real-time updates
+  const latestBlockRef = useRef<number>(0)
+  const blocksDataRef = useRef<any[]>([])
+
+  // Process blocks into Ritual analytics
+  const processRitualAnalytics = useCallback((blocks: any[]) => {
+    let totalTransactions = 0
+    let asyncTransactions = 0
+    let scheduledTransactions = 0
+    let systemTransactions = 0
+    let legacyTxs = 0
+    let eip1559Txs = 0
+    let asyncCommitments = 0
+    let asyncSettlements = 0
+    let totalGasUsed = 0
+    let blockCount = 0
+    const precompileUsage: { [address: string]: number } = {}
+    const recentActivity: any[] = []
+
+    // Process each block's transactions
+    for (const block of blocks) {
+      if (!block.transactions) continue
+      
+      const blockTxCount = Array.isArray(block.transactions) ? block.transactions.length : 0
+      totalTransactions += blockTxCount
+      blockCount++
+      
+      // Analyze transaction types
+      if (Array.isArray(block.transactions)) {
+        for (const tx of block.transactions) {
+          if (typeof tx === 'object' && tx.type) {
+            const txType = parseInt(tx.type, 16)
+            switch (txType) {
+              case 0: legacyTxs++; break
+              case 2: eip1559Txs++; break
+              case 0x10: scheduledTransactions++; break
+              case 0x11: asyncCommitments++; asyncTransactions++; break
+              case 0x12: asyncSettlements++; asyncTransactions++; break
+              default: legacyTxs++; break
+            }
+          }
+        }
+      }
+    }
+
+    const analyticsData: RitualAnalytics = {
+      totalTransactions,
+      asyncTransactions,
+      scheduledTransactions,
+      systemTransactions,
+      asyncAdoptionRate: totalTransactions > 0 ? (asyncTransactions / totalTransactions) * 100 : 0,
+      activeScheduledJobs: scheduledTransactions,
+      avgSettlementTime: 2.5,
+      totalProtocolFees: 0,
+      executorEarnings: 0,
+      validatorEarnings: 0,
+      precompileUsage,
+      transactionTypeDistribution: {
+        'Legacy (0x0)': legacyTxs,
+        'EIP-1559 (0x2)': eip1559Txs,
+        'Scheduled (0x10)': scheduledTransactions,
+        'Async Commitment (0x11)': asyncCommitments,
+        'Async Settlement (0x12)': asyncSettlements
+      },
+      scheduledJobSuccessRate: 95.0,
+      recentActivity
+    }
+
+    setAnalytics(analyticsData)
+  }, [])
+
+  // Handle new blocks from WebSocket
+  const handleNewBlock = useCallback(async (blockHeader: any) => {
+    try {
+      const blockNumber = parseInt(blockHeader.number || blockHeader.blockNumber, 16)
+      
+      if (blockNumber <= latestBlockRef.current) return
+      
+      console.log(`📊 [Ritual Analytics] New block #${blockNumber} - fetching full data...`)
+      
+      const fullBlock = await rethClient.getBlock(blockNumber, true)
+      if (!fullBlock) return
+      
+      blocksDataRef.current.unshift(fullBlock)
+      if (blocksDataRef.current.length > 1000) {
+        blocksDataRef.current = blocksDataRef.current.slice(0, 1000)
+      }
+      
+      latestBlockRef.current = blockNumber
+      
+      const manager = getRealtimeManager()
+      if (manager) {
+        manager.addBlockToPageWindow('ritual-analytics', fullBlock)
+      }
+      
+      processRitualAnalytics(blocksDataRef.current)
+      setLastUpdateTime(new Date())
+      
+      console.log(`✅ [Ritual Analytics] Updated with block #${blockNumber} (total: ${blocksDataRef.current.length} blocks)`)
+    } catch (error) {
+      console.error('Failed to handle new block in ritual analytics:', error)
+    }
+  }, [processRitualAnalytics])
 
   useEffect(() => {
     loadAnalytics()
     
-    // Auto-refresh every 30 seconds
-    const interval = setInterval(loadAnalytics, 30000)
+    // Subscribe to real-time block updates
+    const manager = getRealtimeManager()
+    if (!manager) return
     
-    return () => clearInterval(interval)
-  }, [timeRange])
+    const unsubscribe = manager.subscribe('ritual-analytics', (update) => {
+      if (update.type === 'newBlock') {
+        setIsLive(true)
+        handleNewBlock(update.data)
+      }
+    })
+    
+    console.log(`📡 [Ritual Analytics] Subscribed to real-time updates`)
+    
+    return () => {
+      if (unsubscribe) {
+        unsubscribe()
+        console.log(`🔌 [Ritual Analytics] Unsubscribed`)
+      }
+    }
+  }, [handleNewBlock, timeRange])
 
   const loadAnalytics = async () => {
     try {
       setLoading(true)
       setError(null)
       
-      // Get real data from blockchain
-      console.log('🔍 Loading real analytics data...')
-      const [latestBlock, recentBlocks, scheduledTxs] = await Promise.all([
+      const manager = getRealtimeManager()
+      let recentBlocks: any[] = []
+      let source: 'cache' | 'api' = 'api'
+      
+      // Check for accumulated data first
+      if (manager) {
+        const pageWindowBlocks = manager.getPageBlockWindow('ritual-analytics')
+        console.log(`📊 [Ritual Analytics] Checking per-page window: found ${pageWindowBlocks.length} blocks`)
+        
+        if (pageWindowBlocks.length > 0) {
+          console.log(`📊 [Ritual Analytics] Using ${pageWindowBlocks.length} accumulated blocks!`)
+          recentBlocks = pageWindowBlocks
+          source = 'cache'
+        }
+      }
+      
+      // Fetch fresh if no cache
+      if (recentBlocks.length === 0) {
+        console.log('🔍 Loading real analytics data from API...')
+        recentBlocks = await rethClient.getRecentBlocks(100) // Analyze more blocks for better stats
+        source = 'api'
+      }
+      
+      const [latestBlock, scheduledTxs] = await Promise.all([
         rethClient.getLatestBlockNumber(),
-        rethClient.getRecentBlocks(100), // Analyze more blocks for better stats
         rethClient.getScheduledTransactions()
       ])
+      
+      setDataSource(source)
       
       console.log('📊 Loaded data:', { 
         latestBlock, 
@@ -136,6 +281,12 @@ export default function RitualAnalyticsPage() {
       // Calculate protocol fees (estimated based on gas usage)
       const avgGasPrice = 20 // gwei estimate
       const totalProtocolFees = (totalGasUsed * avgGasPrice) / 1e18 // Convert to RITUAL tokens
+      
+      // Store blocks for real-time updates
+      blocksDataRef.current = recentBlocks
+      if (recentBlocks.length > 0) {
+        latestBlockRef.current = parseInt(recentBlocks[0].number, 16)
+      }
       
       const realAnalytics: RitualAnalytics = {
         totalTransactions,
