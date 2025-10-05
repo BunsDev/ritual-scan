@@ -91,8 +91,7 @@ export default function SettingsPage() {
       // Check if RPC URLs changed
       const rpcChanged = 
         oldConfig.primary !== config.primary ||
-        oldConfig.websocket !== config.websocket ||
-        oldConfig.backup !== config.backup
+        oldConfig.websocket !== config.websocket
       
       // Update configuration
       rethClient.updateConfiguration(config)
@@ -255,32 +254,6 @@ export default function SettingsPage() {
                     </button>
                   </div>
                   <ConnectionStatus type="primary" />
-                </div>
-              </div>
-
-              {/* Backup RPC */}
-              <div>
-                <label className="block text-sm font-medium text-lime-300 mb-2">
-                  Backup RPC URL (Optional)
-                </label>
-                <div className="space-y-2">
-                  <div className="flex space-x-2">
-                    <input
-                      type="text"
-                      value={config.backup || ''}
-                      onChange={(e) => setConfig(prev => ({ ...prev, backup: e.target.value }))}
-                      className="flex-1 px-3 py-2 bg-lime-900/20 border border-lime-600/30 rounded-md text-white placeholder-lime-400 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-transparent"
-                      placeholder="http://backup-node:8545"
-                    />
-                    <button
-                      onClick={() => testConnection(config.backup || '', 'backup')}
-                      disabled={!config.backup || testing.backup}
-                      className="px-4 py-2 bg-lime-600 text-white rounded-md hover:bg-lime-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    >
-                      Test
-                    </button>
-                  </div>
-                  <ConnectionStatus type="backup" />
                 </div>
               </div>
 
