@@ -82,43 +82,56 @@ export default function SettingsPage() {
       
       // If RPC changed, clear all caches (switching to different chain)
       if (rpcChanged) {
-        console.log('🔄 RPC configuration changed - clearing ALL caches...')
+        console.log('🔄 RPC configuration changed - PURGING ALL CACHES...')
         
-        // Step 1: Clear ALL localStorage (not just our keys)
-        const keysToRemove = Object.keys(localStorage).filter(key => 
-          key.includes('ritual') || 
-          key.includes('scan') ||
-          key.includes('cache') ||
-          key.includes('block') ||
-          key.includes('transaction')
-        )
-        keysToRemove.forEach(key => {
-          localStorage.removeItem(key)
-          console.log(`  Removed: ${key}`)
-        })
-        
-        // Step 2: Destroy WebSocket manager singleton
+        // Step 1: Disconnect and destroy WebSocket manager FIRST
         const manager = getRealtimeManager()
         if (manager) {
           manager.disconnect()
-          console.log('  Disconnected WebSocket manager')
+          console.log('  ✓ Disconnected WebSocket')
         }
         
-        // Step 3: Delete the singleton instance
-        if (typeof window !== 'undefined' && (window as any).__realtimeManager) {
-          delete (window as any).__realtimeManager
-          console.log('  Deleted WebSocket manager singleton')
+        // Step 2: Delete singleton instance (critical!)
+        if (typeof window !== 'undefined') {
+          if ((window as any).__realtimeManager) {
+            delete (window as any).__realtimeManager
+            console.log('  ✓ Deleted singleton')
+          }
         }
         
-        // Step 4: Clear session storage (if any)
-        sessionStorage.clear()
-        console.log('  Cleared sessionStorage')
+        // Step 3: NUKE ALL localStorage
+        try {
+          localStorage.clear()
+          console.log('  ✓ Cleared ALL localStorage')
+        } catch (e) {
+          console.warn('  ⚠️ Could not clear localStorage:', e)
+        }
         
-        // Step 5: Force hard reload (bypasses all caches)
-        console.log('🔄 Force reloading with cache clear...')
+        // Step 4: NUKE sessionStorage
+        try {
+          sessionStorage.clear()
+          console.log('  ✓ Cleared sessionStorage')
+        } catch (e) {
+          console.warn('  ⚠️ Could not clear sessionStorage:', e)
+        }
+        
+        // Step 5: Clear Next.js cache if possible
+        if ('caches' in window) {
+          caches.keys().then(names => {
+            names.forEach(name => {
+              caches.delete(name)
+              console.log(`  ✓ Deleted cache: ${name}`)
+            })
+          })
+        }
+        
+        // Step 6: HARD reload with cache bypass (like Ctrl+Shift+R)
+        console.log('🔄 HARD RELOAD in 1 second...')
+        console.log('💥 ALL CACHES NUKED - Starting fresh!')
         setTimeout(() => {
-          window.location.reload()
-        }, 500)
+          // Hard reload bypassing cache
+          window.location.href = window.location.href.split('?')[0] + '?t=' + Date.now()
+        }, 1000)
       }
       
       setSaved(true)
