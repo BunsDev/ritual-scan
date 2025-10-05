@@ -179,6 +179,9 @@ class RealtimeWebSocketManager {
     }
 
     try {
+      // Get WebSocket URL from rethClient (respects user settings!)
+      const dynamicWsUrl = rethClient.getConfiguration().websocket
+      
       // Determine WebSocket URL based on environment
       const isBrowser = typeof window !== 'undefined'
       const isHttps = isBrowser && window.location.protocol === 'https:'
@@ -192,21 +195,29 @@ class RealtimeWebSocketManager {
           wsUrl = `wss://${host}/rpc-ws`
           this.logImportant(`🔗 [${this.connectionId}] Local HTTPS - Caddy proxy: ${wsUrl}`)
         } else {
-          // Production HTTPS with Cloudflare - use tunnel subdomain
+          // Production HTTPS with Cloudflare
           if (host.includes('ding.fish')) {
-            wsUrl = 'wss://ws.ding.fish/'
-            this.logImportant(`🔗 [${this.connectionId}] Cloudflare Tunnel - WebSocket: ${wsUrl}`)
+            // Check if user has custom WebSocket URL (overrides default tunnel)
+            if (dynamicWsUrl && dynamicWsUrl !== 'ws://35.196.101.134:8546') {
+              // User customized - use their URL (convert to wss://)
+              wsUrl = dynamicWsUrl.replace('ws://', 'wss://')
+              this.logImportant(`🔗 [${this.connectionId}] Custom WebSocket (user settings): ${wsUrl}`)
+            } else {
+              // Default - use Cloudflare Tunnel
+              wsUrl = 'wss://ws.ding.fish/'
+              this.logImportant(`🔗 [${this.connectionId}] Cloudflare Tunnel - WebSocket: ${wsUrl}`)
+            }
           } else {
-            // Other HTTPS sites - convert ws:// to wss://
-            const baseUrl = process.env.NEXT_PUBLIC_RETH_WS_URL || 'ws://35.196.101.134:8546'
+            // Other HTTPS sites - use dynamic config or fallback
+            const baseUrl = dynamicWsUrl || process.env.NEXT_PUBLIC_RETH_WS_URL || 'ws://35.196.101.134:8546'
             wsUrl = baseUrl.replace('ws://', 'wss://')
             this.logImportant(`🔗 [${this.connectionId}] HTTPS - Secure WebSocket: ${wsUrl}`)
           }
         }
       } else {
-        // HTTP deployment - direct ws:// connection
-        wsUrl = process.env.NEXT_PUBLIC_RETH_WS_URL || 'ws://35.196.101.134:8546'
-        this.log(`🔗 [${this.connectionId}] HTTP - Direct WebSocket: ${wsUrl}`)
+        // HTTP deployment - use dynamic config or fallback
+        wsUrl = dynamicWsUrl || process.env.NEXT_PUBLIC_RETH_WS_URL || 'ws://35.196.101.134:8546'
+        this.log(`🔗 [${this.connectionId}] HTTP - WebSocket from config: ${wsUrl}`)
       }
       
       this.ws = new WebSocket(wsUrl)
