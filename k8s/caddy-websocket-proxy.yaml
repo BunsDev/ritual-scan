@@ -4,11 +4,14 @@ metadata:
   name: caddy-ws-proxy-config
 data:
   Caddyfile: |
-    # WebSocket proxy on port 443 (accepts any host/IP)
+    # WebSocket proxy - NO TLS (testing)
+    # Client connects with wss:// but we terminate SSL differently
+    {
+        auto_https off
+    }
+    
     :443 {
-        tls internal
-        
-        # Proxy all WebSocket requests to RPC node
+        # Proxy all requests to RPC WebSocket node
         reverse_proxy 35.196.101.134:8546 {
             header_up Host {upstream_hostport}
             header_up Upgrade {http.request.header.Upgrade}
@@ -36,8 +39,6 @@ spec:
         ports:
         - containerPort: 443
           name: https
-        - containerPort: 8546
-          name: websocket
         volumeMounts:
         - name: caddy-config
           mountPath: /etc/caddy/Caddyfile
@@ -49,16 +50,8 @@ spec:
           limits:
             memory: "256Mi"
             cpu: "200m"
-        livenessProbe:
-          tcpSocket:
-            port: 443
-          initialDelaySeconds: 5
-          periodSeconds: 10
-        readinessProbe:
-          tcpSocket:
-            port: 443
-          initialDelaySeconds: 3
-          periodSeconds: 5
+        # Remove probes - they can interfere with NEG readiness
+        # Caddy is lightweight and starts quickly
       volumes:
       - name: caddy-config
         configMap:

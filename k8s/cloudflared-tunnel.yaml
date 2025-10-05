@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cloudflared
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: cloudflared
+  template:
+    metadata:
+      labels:
+        app: cloudflared
+    spec:
+      containers:
+      - name: cloudflared
+        image: cloudflare/cloudflared:latest
+        args:
+        - tunnel
+        - --no-autoupdate
+        - run
+        - --token
+        - eyJhIjoiYmI5YzQ3NTFhZDYyMmQ5OGZmNTkzYWViMDNmMDY5MTQiLCJ0IjoiNjI0MDlhNjQtYzk3MC00Y2RjLTg2ZDgtMmI1ZDQ0YjVmMDFlIiwicyI6IlpEVmlZMk14Wm1VdE1EWXpPUzAwWVdaaExXSm1PRGN0TW1JeFpEVTFOV1ZpT0dFeSJ9
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        # cloudflared doesn't expose health endpoints, skip probes
+        # It's lightweight and auto-restarts if it crashes
+

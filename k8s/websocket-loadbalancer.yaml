@@ -12,8 +12,6 @@ spec:
     port: 443
     targetPort: 443
     protocol: TCP
-  sessionAffinity: ClientIP
-  sessionAffinityConfig:
-    clientIP:
-      timeoutSeconds: 86400
+  # Remove session affinity to avoid NEG mode which blocks readiness
+  externalTrafficPolicy: Local  # Direct routing for better performance
 
