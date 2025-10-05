@@ -184,11 +184,16 @@ class RealtimeWebSocketManager {
           wsUrl = `wss://${host}/rpc-ws`
           this.logImportant(`🔗 [${this.connectionId}] Local HTTPS - Caddy proxy: ${wsUrl}`)
         } else {
-          // Production HTTPS - convert ws:// to wss:// for secure page
-          // Browser requires wss:// from https:// page (mixed content security)
-          const baseUrl = process.env.NEXT_PUBLIC_RETH_WS_URL || 'ws://35.196.101.134:8546'
-          wsUrl = baseUrl.replace('ws://', 'wss://')
-          this.logImportant(`🔗 [${this.connectionId}] HTTPS - Secure WebSocket: ${wsUrl}`)
+          // Production HTTPS with Cloudflare - use tunnel subdomain
+          if (host.includes('ding.fish')) {
+            wsUrl = 'wss://ws.ding.fish/'
+            this.logImportant(`🔗 [${this.connectionId}] Cloudflare Tunnel - WebSocket: ${wsUrl}`)
+          } else {
+            // Other HTTPS sites - convert ws:// to wss://
+            const baseUrl = process.env.NEXT_PUBLIC_RETH_WS_URL || 'ws://35.196.101.134:8546'
+            wsUrl = baseUrl.replace('ws://', 'wss://')
+            this.logImportant(`🔗 [${this.connectionId}] HTTPS - Secure WebSocket: ${wsUrl}`)
+          }
         }
       } else {
         // HTTP deployment - direct ws:// connection
