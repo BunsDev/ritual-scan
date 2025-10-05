@@ -172,8 +172,8 @@ export default function BlockDetailPage({ params }: PageProps) {
       return 'Transfer'
     }
     
-    // Get method selector (first 4 bytes)
-    const methodSelector = input.slice(0, 10)
+    // Get method selector (first 4 bytes = 0x + 8 hex chars)
+    const methodSelector = input.slice(0, 10).toLowerCase()
     
     // Common method signatures (first 4 bytes = method selector)
     const methodSignatures: { [key: string]: string } = {
@@ -203,17 +203,46 @@ export default function BlockDetailPage({ params }: PageProps) {
       '0xc45a0155': 'mint (Uniswap)',
       '0xac9650d8': 'multicall',
       
-      // Ritual-specific
-      '0x12345678': 'submitAsyncCall',
-      '0xabcdef12': 'scheduleCall',
-      '0x87654321': 'cancelScheduledCall',
+      // Ritual RitualWallet (from ritual-sc-internal ABIs)
+      '0xb6b55f25': 'deposit',
+      '0x2f4f21e2': 'depositFor',
+      '0x0955f449': 'settleAsyncTransaction',
+      '0x5312ea8e': 'emergencyWithdraw',
+      '0x71265eac': 'refundGas',
+      '0xe33d3995': 'deductExecutionFees',
+      
+      // Ritual Scheduler
+      '0x434c659c': 'schedule',
+      '0x40e58ee5': 'cancel',
+      '0x5601eaea': 'execute',
+      '0x163e6b98': 'getCallState',
+      '0x786db84d': 'cleanupExpiredCalls',
+      '0xd183ce14': 'calls',
+      '0x05d35696': 'callToSlot',
+      
+      // Ritual AsyncJobTracker
+      '0xae252a36': 'addJob',
+      '0x8a1d7219': 'removeJob',
+      '0xf729cf0d': 'getJob',
+      '0x76fe2e62': 'getPendingJobs',
+      '0x6830cdc4': 'getJobCount',
+      '0x3e3cd2f7': 'cleanupExpiredJobs',
+      
+      // Ritual Precompile Consumer
+      '0xce37732b': 'callHTTPCall',
+      '0xb97caff7': 'callLLMInference',
+      '0xb658d4fa': 'callONNXInference',
+      '0x41d3f39a': 'callJQQuery',
+      '0xeb5f03e7': 'callED25519SigVer',
+      '0xcfd7e58d': 'callSECP256R1SigVer',
+      '0x075a750d': 'callHTTPWithJQ',
       
       // Fallback
       '0x': 'Transfer'
     }
     
     const methodName = methodSignatures[methodSelector]
-    return methodName || `0x${methodSelector.slice(2, 10)}` // Return selector if unknown
+    return methodName || methodSelector // Return full selector if unknown
   }
 
   const calculateGasTarget = (gasUsed: string, gasLimit: string) => {
