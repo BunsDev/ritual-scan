@@ -1188,50 +1188,9 @@ export default function AnalyticsPage() {
         {data.blockTimes.length > 0 && (
           <div className="mt-8 bg-black/20 backdrop-blur-sm rounded-lg p-6 border border-lime-500/30 overflow-hidden">
             <h3 className="text-xl font-semibold text-white mb-4">Block Time Distribution</h3>
-            <div className="mb-4">
-              <div className="flex flex-wrap gap-2">
-                <button
-                  onClick={() => setShowPerBlock(!showPerBlock)}
-                  className={`px-3 py-1 text-xs rounded-full border transition-colors ${
-                    showPerBlock 
-                      ? 'bg-lime-500/20 text-lime-300 border-lime-500/30' 
-                      : 'bg-gray-500/20 text-gray-400 border-gray-500/30'
-                  }`}
-                >
-                  Per Block
-                </button>
-                <button
-                  onClick={() => setShow5min(!show5min)}
-                  className={`px-3 py-1 text-xs rounded-full border transition-colors ${
-                    show5min 
-                      ? 'bg-green-500/20 text-green-300 border-green-500/30' 
-                      : 'bg-gray-500/20 text-gray-400 border-gray-500/30'
-                  }`}
-                >
-                  5min avg
-                </button>
-                <button
-                  onClick={() => setShow30min(!show30min)}
-                  className={`px-3 py-1 text-xs rounded-full border transition-colors ${
-                    show30min 
-                      ? 'bg-orange-500/20 text-orange-300 border-orange-500/30' 
-                      : 'bg-gray-500/20 text-gray-400 border-gray-500/30'
-                  }`}
-                >
-                  30min avg
-                </button>
-                <button
-                  onClick={() => setShow1hr(!show1hr)}
-                  className={`px-3 py-1 text-xs rounded-full border transition-colors ${
-                    show1hr 
-                      ? 'bg-red-500/20 text-red-300 border-red-500/30' 
-                      : 'bg-gray-500/20 text-gray-400 border-gray-500/30'
-                  }`}
-                >
-                  1hr avg
-                </button>
-              </div>
-            </div>
+            <p className="text-lime-300 text-sm mb-4">
+              Statistical distribution of block times across {data.blockTimes.length} blocks
+            </p>
             <div className="w-full h-80 min-h-0">
               <Plot
                 data={[
