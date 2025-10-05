@@ -502,7 +502,7 @@ export default function AnalyticsPage() {
           <div className="bg-black/20 backdrop-blur-sm rounded-lg p-6 border border-lime-500/30">
             <div className="text-lime-400 text-sm font-medium">Avg Transactions</div>
             <div className="text-2xl font-bold text-white">
-              {Math.round(data.avgTxsPerBlock.reduce((a, b) => a + b, 0) / data.avgTxsPerBlock.length)}
+              {(data.avgTxsPerBlock.reduce((a, b) => a + b, 0) / data.avgTxsPerBlock.length).toFixed(2)}
             </div>
             <div className="text-lime-300 text-xs">per block</div>
           </div>
@@ -510,7 +510,7 @@ export default function AnalyticsPage() {
           <div className="bg-black/20 backdrop-blur-sm rounded-lg p-6 border border-lime-500/30">
             <div className="text-lime-400 text-sm font-medium">Avg Block Size</div>
             <div className="text-2xl font-bold text-white">
-              {Math.round(data.avgBlockSize.reduce((a, b) => a + b, 0) / data.avgBlockSize.length / 1024)} KB
+              {(data.avgBlockSize.reduce((a, b) => a + b, 0) / data.avgBlockSize.length / 1024).toFixed(2)} KB
             </div>
             <div className="text-lime-300 text-xs">average size</div>
           </div>
@@ -518,7 +518,7 @@ export default function AnalyticsPage() {
           <div className="bg-black/20 backdrop-blur-sm rounded-lg p-6 border border-lime-500/30">
             <div className="text-lime-400 text-sm font-medium">Avg Block Time</div>
             <div className="text-2xl font-bold text-white">
-              {data.blockTimes.length > 0 ? Math.round(data.blockTimes.reduce((a, b) => a + b, 0) / data.blockTimes.length) : 0}s
+              {data.blockTimes.length > 0 ? (data.blockTimes.reduce((a, b) => a + b, 0) / data.blockTimes.length).toFixed(2) : '0.00'}s
             </div>
             <div className="text-lime-300 text-xs">between blocks</div>
           </div>
