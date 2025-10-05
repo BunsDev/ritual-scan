@@ -177,11 +177,12 @@ class RealtimeWebSocketManager {
       
       let wsUrl: string
       if (isBrowser && isHttps) {
-        // Use WSS proxy for HTTPS sites to avoid mixed content errors
-        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+        // Use Caddy WebSocket proxy for HTTPS sites (avoids mixed content errors)
+        // Caddy proxies wss://host/rpc-ws → ws://RPC_NODE:8546
+        const protocol = 'wss:'
         const host = window.location.host
-        wsUrl = `${protocol}//${host}/api/ws-proxy?id=${this.connectionId}`
-        this.log(`🔗 [${this.connectionId}] Using WebSocket proxy for HTTPS: ${wsUrl}`)
+        wsUrl = `${protocol}//${host}/rpc-ws`
+        this.logImportant(`🔗 [${this.connectionId}] Using Caddy WebSocket proxy: ${wsUrl}`)
       } else {
         // Direct connection for HTTP or server-side
         wsUrl = process.env.NEXT_PUBLIC_RETH_WS_URL || 'ws://35.196.101.134:8546'
