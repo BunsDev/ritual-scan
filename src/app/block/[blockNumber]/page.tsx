@@ -91,9 +91,8 @@ export default function BlockDetailPage({ params }: PageProps) {
           total: blockData.transactions.length
         }
         
-        // If transactions are just hashes, we need to fetch details to get types
-        // For now, we'll make a reasonable assumption based on recent Ritual Chain data
-        for (const tx of blockData.transactions.slice(0, 10)) { // Sample first 10 for performance
+        // Process all transactions to count types accurately
+        for (const tx of blockData.transactions) {
           if (typeof tx === 'object' && tx.type) {
             const txType = tx.type
             switch (txType) {
@@ -538,7 +537,7 @@ export default function BlockDetailPage({ params }: PageProps) {
               Transactions ({block.transactions.length})
             </h2>
             <div className="bg-white/5 border border-lime-500/20 rounded-lg divide-y divide-lime-500/10">
-              {block.transactions.slice(0, 10).map((tx: any, index: number) => (
+              {block.transactions.map((tx: any, index: number) => (
                 <div key={tx.hash || index} className="p-4 hover:bg-lime-500/5">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-4">
