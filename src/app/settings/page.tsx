@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { rethClient, RpcConfig } from '@/lib/reth-client'
+import { getRealtimeManager } from '@/lib/realtime-websocket'
 import { Navigation } from '@/components/Navigation'
 import Link from 'next/link'
 import { useParticleBackground } from '@/hooks/useParticleBackground'
@@ -67,7 +68,39 @@ export default function SettingsPage() {
   const saveConfiguration = async () => {
     setLoading(true)
     try {
+      // Get old configuration before updating
+      const oldConfig = rethClient.getConfiguration()
+      
+      // Check if RPC URLs changed
+      const rpcChanged = 
+        oldConfig.primary !== config.primary ||
+        oldConfig.websocket !== config.websocket ||
+        oldConfig.backup !== config.backup
+      
+      // Update configuration
       rethClient.updateConfiguration(config)
+      
+      // If RPC changed, clear all caches (switching to different chain)
+      if (rpcChanged) {
+        console.log('🔄 RPC configuration changed - clearing all caches...')
+        
+        // Clear localStorage caches
+        localStorage.removeItem('ritual-scan-cache')
+        localStorage.removeItem('ritual-scan-page-windows')
+        
+        // Clear WebSocket manager cache
+        const manager = getRealtimeManager()
+        if (manager) {
+          manager.disconnect()
+          // Clear in-memory caches by disconnecting
+          console.log('✅ Cleared WebSocket cache and disconnected')
+        }
+        
+        // Reload page to reinitialize with new RPC
+        console.log('🔄 Reloading page with new RPC configuration...')
+        setTimeout(() => window.location.reload(), 1000)
+      }
+      
       setSaved(true)
       setTimeout(() => setSaved(false), 3000)
     } catch (error) {
