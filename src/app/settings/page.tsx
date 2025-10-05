@@ -82,23 +82,43 @@ export default function SettingsPage() {
       
       // If RPC changed, clear all caches (switching to different chain)
       if (rpcChanged) {
-        console.log('🔄 RPC configuration changed - clearing all caches...')
+        console.log('🔄 RPC configuration changed - clearing ALL caches...')
         
-        // Clear localStorage caches
-        localStorage.removeItem('ritual-scan-cache')
-        localStorage.removeItem('ritual-scan-page-windows')
+        // Step 1: Clear ALL localStorage (not just our keys)
+        const keysToRemove = Object.keys(localStorage).filter(key => 
+          key.includes('ritual') || 
+          key.includes('scan') ||
+          key.includes('cache') ||
+          key.includes('block') ||
+          key.includes('transaction')
+        )
+        keysToRemove.forEach(key => {
+          localStorage.removeItem(key)
+          console.log(`  Removed: ${key}`)
+        })
         
-        // Clear WebSocket manager cache
+        // Step 2: Destroy WebSocket manager singleton
         const manager = getRealtimeManager()
         if (manager) {
           manager.disconnect()
-          // Clear in-memory caches by disconnecting
-          console.log('✅ Cleared WebSocket cache and disconnected')
+          console.log('  Disconnected WebSocket manager')
         }
         
-        // Reload page to reinitialize with new RPC
-        console.log('🔄 Reloading page with new RPC configuration...')
-        setTimeout(() => window.location.reload(), 1000)
+        // Step 3: Delete the singleton instance
+        if (typeof window !== 'undefined' && (window as any).__realtimeManager) {
+          delete (window as any).__realtimeManager
+          console.log('  Deleted WebSocket manager singleton')
+        }
+        
+        // Step 4: Clear session storage (if any)
+        sessionStorage.clear()
+        console.log('  Cleared sessionStorage')
+        
+        // Step 5: Force hard reload (bypasses all caches)
+        console.log('🔄 Force reloading with cache clear...')
+        setTimeout(() => {
+          window.location.reload()
+        }, 500)
       }
       
       setSaved(true)
