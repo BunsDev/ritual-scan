@@ -101,9 +101,10 @@ export default function SettingsPage() {
       if (rpcChanged) {
         console.log('🔄 RPC configuration changed - PURGING ALL CACHES...')
         
-        // Step 1: SAVE new config to sessionStorage (survives localStorage.clear)
+        // Step 1: Set flag in sessionStorage to prevent cache restoration on next load
+        sessionStorage.setItem('ritual-scan-skip-cache-restore', 'true')
         sessionStorage.setItem('ritual-scan-new-rpc-config', JSON.stringify(config))
-        console.log('  ✓ Saved new RPC config to sessionStorage')
+        console.log('  ✓ Set skip-restore flag + saved new config to sessionStorage')
         
         // Step 2: Disconnect and destroy WebSocket manager
         const manager = getRealtimeManager()

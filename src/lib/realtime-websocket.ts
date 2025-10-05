@@ -67,6 +67,14 @@ class RealtimeWebSocketManager {
   
   private restoreCacheFromStorage() {
     try {
+      // Check if we should skip restoration (RPC config change in progress)
+      const skipRestore = sessionStorage.getItem('ritual-scan-skip-cache-restore')
+      if (skipRestore === 'true') {
+        console.log(`🚫 [${this.connectionId}] Skipping cache restore - RPC config changed`)
+        sessionStorage.removeItem('ritual-scan-skip-cache-restore')
+        return
+      }
+      
       // Restore global cache
       const stored = localStorage.getItem('ritual-scan-cache')
       if (stored) {
