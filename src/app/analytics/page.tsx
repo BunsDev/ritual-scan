@@ -74,6 +74,12 @@ export default function AnalyticsPage() {
 
   // Process blocks into analytics data structure
   const processBlocks = useCallback((blocks: any[]) => {
+    // Debug: Check what data we have
+    const sampleBlock = blocks[0]
+    const hasTxs = Array.isArray(sampleBlock?.transactions) && sampleBlock.transactions.length > 0
+    const hasSize = sampleBlock?.size && sampleBlock.size !== '0x0'
+    console.log(`📊 [Analytics] Processing ${blocks.length} blocks - Sample has: txs=${hasTxs}, size=${hasSize}`)
+    
     const blockNumbers: number[] = []
     const timestamps: string[] = []
     const avgGasUsed: number[] = []
@@ -98,6 +104,11 @@ export default function AnalyticsPage() {
       const gasLimit = parseInt(block.gasLimit, 16)
       const txCount = Array.isArray(block.transactions) ? block.transactions.length : 0
       const blockSize = parseInt(block.size || '0x0', 16)
+      
+      // Debug first few blocks
+      if (i < 3) {
+        console.log(`  Block #${blockNum}: txs=${txCount}, size=${blockSize}, hasTxArray=${Array.isArray(block.transactions)}`)
+      }
       const timestampValue = parseInt(block.timestamp, 16)
       const timestamp = timestampValue > 1577836800000 ? 
         new Date(timestampValue) : 
@@ -191,6 +202,15 @@ export default function AnalyticsPage() {
         return
       }
       
+      // Debug: Verify we got full data
+      const hasTxData = Array.isArray(fullBlock.transactions) && fullBlock.transactions.length > 0
+      const hasSizeData = fullBlock.size && fullBlock.size !== '0x0'
+      console.log(`  Fetched block #${blockNumber}: txs=${hasTxData ? fullBlock.transactions.length : 0}, size=${fullBlock.size || '0x0'}`)
+      
+      if (!hasTxData && !hasSizeData) {
+        console.warn(`⚠️ [Analytics] Block #${blockNumber} has no transaction or size data!`)
+      }
+      
       // Add to blocks data (keep most recent 1000 blocks)
       blocksDataRef.current.unshift(fullBlock)
       if (blocksDataRef.current.length > 1000) {
@@ -255,6 +275,13 @@ export default function AnalyticsPage() {
         if (pageWindowBlocks.length > 0) {
           // User returning - use accumulated data!
           console.log(`📊 [Analytics] Found ${pageWindowBlocks.length} accumulated blocks from previous session!`)
+          
+          // DEBUG: Check if accumulated blocks have full data
+          const sampleBlock = pageWindowBlocks[0]
+          const hasTxs = Array.isArray(sampleBlock.transactions) && sampleBlock.transactions.length > 0
+          const hasSize = sampleBlock.size && sampleBlock.size !== '0x0'
+          console.log(`  Sample block from cache: txs=${hasTxs ? sampleBlock.transactions.length : 0}, size=${sampleBlock.size || '0x0'}`)
+          
           recentBlocks = pageWindowBlocks
           source = 'cache'
           
