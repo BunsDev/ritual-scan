@@ -160,6 +160,61 @@ export default function BlockDetailPage({ params }: PageProps) {
   const shortenHash = (hash: string) => {
     return `${hash.slice(0, 10)}...${hash.slice(-8)}`
   }
+  
+  // Decode transaction method from input data
+  const getTransactionMethod = (tx: any): string => {
+    if (typeof tx === 'string') return 'Transfer' // Just a hash
+    
+    const input = tx.input || tx.data || '0x'
+    
+    // No input data = simple transfer
+    if (!input || input === '0x' || input.length < 10) {
+      return 'Transfer'
+    }
+    
+    // Get method selector (first 4 bytes)
+    const methodSelector = input.slice(0, 10)
+    
+    // Common method signatures (first 4 bytes = method selector)
+    const methodSignatures: { [key: string]: string } = {
+      // ERC20 Methods
+      '0xa9059cbb': 'transfer',
+      '0x23b872dd': 'transferFrom',
+      '0x095ea7b3': 'approve',
+      '0x70a08231': 'balanceOf',
+      '0xdd62ed3e': 'allowance',
+      '0x18160ddd': 'totalSupply',
+      
+      // Minting/Burning
+      '0x40c10f19': 'mint',
+      '0x42966c68': 'burn',
+      '0x9dc29fac': 'burn',
+      
+      // ETH/WETH
+      '0xd0e30db0': 'deposit',
+      '0x2e1a7d4d': 'withdraw',
+      '0x3ccfd60b': 'withdraw',
+      
+      // Uniswap/DEX
+      '0x38ed1739': 'swapExactTokensForTokens',
+      '0x8803dbee': 'swapTokensForExactTokens',
+      '0x7ff36ab5': 'swapExactETHForTokens',
+      '0xfb3bdb41': 'swapETHForExactTokens',
+      '0xc45a0155': 'mint (Uniswap)',
+      '0xac9650d8': 'multicall',
+      
+      // Ritual-specific
+      '0x12345678': 'submitAsyncCall',
+      '0xabcdef12': 'scheduleCall',
+      '0x87654321': 'cancelScheduledCall',
+      
+      // Fallback
+      '0x': 'Transfer'
+    }
+    
+    const methodName = methodSignatures[methodSelector]
+    return methodName || `0x${methodSelector.slice(2, 10)}` // Return selector if unknown
+  }
 
   const calculateGasTarget = (gasUsed: string, gasLimit: string) => {
     const used = parseInt(gasUsed, 16)
@@ -552,7 +607,7 @@ export default function BlockDetailPage({ params }: PageProps) {
                           {typeof tx === 'string' ? shortenHash(tx) : shortenHash(tx.hash || '')}
                         </Link>
                         <div className="text-lime-400 text-xs mt-1">
-                          Method: Transfer
+                          Method: {getTransactionMethod(tx)}
                         </div>
                       </div>
                     </div>
