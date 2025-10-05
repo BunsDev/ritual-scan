@@ -67,6 +67,7 @@ class RealtimeWebSocketManager {
   
   private restoreCacheFromStorage() {
     try {
+      // Restore global cache
       const stored = localStorage.getItem('ritual-scan-cache')
       if (stored) {
         const data = JSON.parse(stored)
@@ -78,6 +79,28 @@ class RealtimeWebSocketManager {
           this.log(`💾 [${this.connectionId}] Restored ${data.blocks.length} blocks from localStorage (age: ${(age/1000).toFixed(1)}s)`)
         } else {
           this.log(`⏰ [${this.connectionId}] localStorage cache too old (${(age/1000).toFixed(1)}s), discarding`)
+        }
+      }
+      
+      // Restore per-page windows
+      const pageWindowsStored = localStorage.getItem('ritual-scan-page-windows')
+      if (pageWindowsStored) {
+        const data = JSON.parse(pageWindowsStored)
+        const age = Date.now() - data.timestamp
+        
+        // Use page windows if less than 5 minutes old (more generous than global cache)
+        if (age < 300000 && data.windows) {
+          let totalBlocks = 0
+          Object.entries(data.windows).forEach(([pageId, blocks]: [string, any]) => {
+            if (Array.isArray(blocks) && blocks.length > 0) {
+              this.pageBlockWindows.set(pageId, blocks)
+              totalBlocks += blocks.length
+              this.log(`💾 [${this.connectionId}] Restored ${blocks.length} blocks for page '${pageId}'`)
+            }
+          })
+          this.logImportant(`💾 [${this.connectionId}] Restored ${this.pageBlockWindows.size} page windows with ${totalBlocks} total blocks (age: ${(age/1000).toFixed(1)}s)`)
+        } else {
+          this.log(`⏰ [${this.connectionId}] Page windows cache too old (${(age/1000).toFixed(1)}s), discarding`)
         }
       }
     } catch (error) {
@@ -104,6 +127,7 @@ class RealtimeWebSocketManager {
   
   private saveCacheToStorageNow() {
     try {
+      // Save global cache
       if (this.recentBlocksCache.length > 0) {
         const data = {
           blocks: this.recentBlocksCache,
@@ -112,8 +136,32 @@ class RealtimeWebSocketManager {
         localStorage.setItem('ritual-scan-cache', JSON.stringify(data))
         this.lastLocalStorageSave = Date.now()
       }
+      
+      // Save per-page windows
+      if (this.pageBlockWindows.size > 0) {
+        const windows: { [pageId: string]: any[] } = {}
+        this.pageBlockWindows.forEach((blocks, pageId) => {
+          windows[pageId] = blocks
+        })
+        
+        const pageWindowsData = {
+          windows,
+          timestamp: Date.now()
+        }
+        localStorage.setItem('ritual-scan-page-windows', JSON.stringify(pageWindowsData))
+        
+        // Calculate total size for logging
+        const totalSize = JSON.stringify(pageWindowsData).length
+        const sizeMB = (totalSize / (1024 * 1024)).toFixed(2)
+        this.log(`💾 [${this.connectionId}] Saved ${this.pageBlockWindows.size} page windows (${sizeMB}MB)`)
+      }
     } catch (error) {
       // Silently fail - localStorage might be full or disabled
+      if (error instanceof DOMException && error.name === 'QuotaExceededError') {
+        console.warn(`⚠️  [${this.connectionId}] localStorage quota exceeded - clearing old data`)
+        // Clear old data to make room
+        localStorage.removeItem('ritual-scan-page-windows')
+      }
     }
   }
 
