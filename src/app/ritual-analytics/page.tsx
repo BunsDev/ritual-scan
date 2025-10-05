@@ -354,27 +354,30 @@ export default function RitualAnalyticsPage() {
             <div>
               <h1 className="text-3xl font-bold text-white mb-2">Ritual Chain Stats</h1>
               <p className="text-lime-200">
-                Statistical insights for Ritual Chain features including async execution and scheduled transactions
+                Statistical insights from {blocksDataRef.current.length || 0} blocks • 
+                {isLive ? ' Real-time updates active' : ' Live data from RETH nodes'}
+                {blocksDataRef.current.length > 100 && (
+                  <span className="text-lime-400"> • {(blocksDataRef.current.length * 2 / 60).toFixed(1)} min of history</span>
+                )}
               </p>
             </div>
             <div className="flex items-center space-x-4">
-              <select
-                value={timeRange}
-                onChange={(e) => setTimeRange(e.target.value as any)}
-                className="px-3 py-2 bg-black/50 border border-lime-500/30 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-lime-400"
-              >
-                <option value="1h">Last Hour</option>
-                <option value="6h">Last 6 Hours</option>
-                <option value="24h">Last 24 Hours</option>
-                <option value="7d">Last 7 Days</option>
-              </select>
-              <button 
-                onClick={loadAnalytics}
-                disabled={loading}
-                className="px-4 py-2 bg-lime-600 text-white rounded-md hover:bg-lime-700 disabled:opacity-50 transition-colors"
-              >
-                {loading ? 'Loading...' : 'Refresh'}
-              </button>
+              {isLive && (
+                <span className="px-3 py-1 text-sm font-medium text-white bg-lime-600/20 border border-lime-500/30 rounded-full flex items-center gap-2">
+                  <div className="w-2 h-2 bg-lime-400 rounded-full animate-pulse"></div>
+                  Live Updates
+                </span>
+              )}
+              {dataSource === 'cache' && !isLive && (
+                <span className="px-3 py-1 text-sm font-medium text-white bg-blue-600/20 border border-blue-500/30 rounded-full">
+                  ⚡ From Cache
+                </span>
+              )}
+              {lastUpdateTime && (
+                <span className="text-lime-300 text-sm">
+                  Last update: {lastUpdateTime.toLocaleTimeString()}
+                </span>
+              )}
             </div>
           </div>
         </div>
