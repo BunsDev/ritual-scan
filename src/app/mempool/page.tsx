@@ -1,11 +1,9 @@
 'use client'
 
-import { useState, useEffect, useCallback, useTransition } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { rethClient } from '@/lib/reth-client'
 import { Navigation } from '@/components/Navigation'
 import { getRealtimeManager } from '@/lib/realtime-websocket'
-import { useMempoolUpdates, useTransactionUpdates, useRealtimeStatus } from '@/hooks/useRealtime'
-import { useEnhancedMempoolUpdates, usePendingTransactionStream } from '@/hooks/useRealtimeTier1'
 import { TransactionTypeChip, TransactionTypeLegend } from '@/components/TransactionTypeChip'
 import Link from 'next/link'
 import { useParticleBackground } from '@/hooks/useParticleBackground'
@@ -41,97 +39,64 @@ export default function MempoolPage() {
   const [initialLoading, setInitialLoading] = useState(true)
   const [isUpdating, setIsUpdating] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [isPending, startTransition] = useTransition()
   const [lastUpdateTime, setLastUpdateTime] = useState<number>(0)
   const [isMounted, setIsMounted] = useState(false)
 
-  // Use HTTP polling instead of WebSocket for mempool data
+  // Use WebSocket for real-time mempool updates
   useEffect(() => {
     setIsMounted(true)
-    loadMempoolData()
+    loadMempoolData() // Initial load
     
-    // Set up polling interval for mempool data
-    const interval = setInterval(() => {
-      silentUpdate()
-    }, 1000) // Poll every 1 second
+    // Subscribe to WebSocket mempool updates
+    const manager = getRealtimeManager()
+    if (!manager) {
+      // Fallback to HTTP polling if WebSocket not available
+      const interval = setInterval(() => silentUpdate(), 2000)
+      return () => clearInterval(interval)
+    }
     
-    return () => clearInterval(interval)
+    const unsubscribe = manager.subscribe('mempool-page', (update) => {
+      if (update.type === 'mempoolUpdate') {
+        // Update stats from WebSocket
+        setStats(prevStats => ({
+          ...prevStats,
+          ...update.data
+        }))
+      }
+      
+      if (update.type === 'newPendingTransaction') {
+        // New pending transaction received
+        const txHash = update.data.hash
+        if (txHash) {
+          // Trigger a light refresh to get transaction details
+          silentUpdate()
+        }
+      }
+    })
+    
+    return () => {
+      if (unsubscribe) unsubscribe()
+    }
   }, [])
 
-  // Remove WebSocket integration - using HTTP polling instead
-  /*
-  // Real-time WebSocket integration
-  const realtimeStatus = useRealtimeStatus()
-
-  // Tier 1: Enhanced real-time mempool updates
-  useEnhancedMempoolUpdates((mempoolData) => {
-    console.log('🚀 Tier 1: Enhanced mempool update received:', mempoolData)
-    setStats(prev => ({
-      ...prev,
-      pending: mempoolData.pending || prev.pending,
-      queued: mempoolData.queued || prev.queued,
-      totalSize: mempoolData.totalSize || prev.totalSize,
-      baseFee: mempoolData.baseFee || prev.baseFee
-    }))
-  })
-
-  // Tier 1: Real-time pending transaction stream
-  usePendingTransactionStream((txHash) => {
-    console.log('⚡ Tier 1: New pending transaction:', txHash)
-    // Add to transaction list in real-time
-    setTransactions(prev => {
-      const newTx: MempoolTransaction = {
-        hash: txHash,
-        from: '0x...',
-        value: '0',
-        gas: '21000',
-        gasPrice: '0',
-        nonce: '0',
-        status: 'pending'
-      }
-      return [newTx, ...prev.slice(0, 49)] // Keep only 50 most recent
-    })
-  })
-  */
-
-  // HTTP polling-based update function
+  // Throttled update for WebSocket-triggered refreshes
   const silentUpdate = useCallback(async () => {
     const now = Date.now()
-    if (now - lastUpdateTime < 1500) return // Max 1 update per 1.5 seconds
+    if (now - lastUpdateTime < 5000) return // Throttle to max once per 5 seconds
     
     setLastUpdateTime(now)
     setIsUpdating(true)
     
     try {
-      startTransition(async () => {
-        const [mempoolTxs, mempoolStats] = await Promise.all([
-          rethClient.getMempoolTransactions(),
-          rethClient.getMempoolStats()
-        ])
-        
-        setTransactions(prevTxs => {
-          // Smart merge - only update if we have different transactions
-          if (mempoolTxs.length !== prevTxs.length) {
-            return mempoolTxs
-          }
-          
-          // Check if any transaction hashes are different
-          const hasChanged = mempoolTxs.some((newTx, index) => 
-            newTx.hash !== prevTxs[index]?.hash
-          )
-          
-          return hasChanged ? mempoolTxs : prevTxs
-        })
-
-        setStats(prevStats => ({
-          pending: mempoolStats.pending || prevStats.pending,
-          queued: mempoolStats.queued || prevStats.queued,
-          totalSize: mempoolStats.totalSize || prevStats.totalSize,
-          baseFee: mempoolStats.baseFee || prevStats.baseFee
-        }))
-      })
+      const [mempoolTxs, mempoolStats] = await Promise.all([
+        rethClient.getMempoolTransactions(),
+        rethClient.getMempoolStats()
+      ])
+      
+      setTransactions(mempoolTxs)
+      setStats(mempoolStats)
     } catch (error) {
-      console.warn('Silent mempool update failed:', error)
+      // Silently fail - WebSocket will keep updating stats
     } finally {
       setIsUpdating(false)
     }

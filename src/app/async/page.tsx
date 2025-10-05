@@ -30,11 +30,13 @@ export default function AsyncPage() {
   const [isUpdating, setIsUpdating] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState<'all' | 'commitment' | 'settlement'>('all')
+  const [isMounted, setIsMounted] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [lastUpdateTime, setLastUpdateTime] = useState<number>(0)
   
   // Use HTTP polling instead of WebSocket
   useEffect(() => {
+    setIsMounted(true)
     loadAsyncTransactions()
     
     // Set up polling interval
@@ -204,7 +206,7 @@ export default function AsyncPage() {
               Async Transactions ({filteredTransactions.length})
             </h3>
             <div className="text-sm text-lime-300">
-              Last updated: {new Date().toLocaleTimeString()}
+              Last updated: {isMounted ? new Date().toLocaleTimeString() : '--:--:--'}
             </div>
           </div>
 

@@ -223,13 +223,19 @@ export class RETHClient {
     const targetUrl = (isBrowser && isHttps) ? '/api/rpc-proxy' : this.rpcUrl
 
     try {
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 10000) // 10s timeout
+      
       const response = await fetch(targetUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
+        signal: controller.signal
       })
+      
+      clearTimeout(timeoutId)
       
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`)
@@ -247,7 +253,16 @@ export class RETHClient {
       }
       return data.result
     } catch (error) {
-      console.error(`Failed to call ${method}:`, error)
+      // Suppress common network timeout errors from background polling
+      const errorMsg = (error as any)?.message || ''
+      const isNetworkError = errorMsg.includes('Failed to fetch') || 
+                            errorMsg.includes('aborted') ||
+                            errorMsg.includes('timeout')
+      
+      // Only log errors that aren't transient network issues
+      if (!isNetworkError) {
+        console.error(`Failed to call ${method}:`, error)
+      }
       
       // Try backup RPC if available and not already using proxy
       if (!this.backupRpcUrl || this.backupRpcUrl === this.rpcUrl || (isBrowser && isHttps)) {
