@@ -79,16 +79,21 @@ export function ConnectWalletButton() {
       const config = rethClient.getConfiguration()
       let rpcUrl = config.primary || 'http://35.196.101.134:8545'
       
-      // MetaMask requires HTTPS for security, but allows HTTP for localhost
-      // For production, convert HTTP to HTTPS if not localhost
-      if (rpcUrl.startsWith('http://') && !rpcUrl.includes('localhost') && !rpcUrl.includes('127.0.0.1')) {
-        // Try HTTPS version (most public RPC nodes support both)
-        rpcUrl = rpcUrl.replace('http://', 'https://')
+      // For localhost, keep HTTP (MetaMask allows this)
+      // For remote IPs, we need to use the current page's protocol
+      if (!rpcUrl.includes('localhost') && !rpcUrl.includes('127.0.0.1')) {
+        // If we're on localhost:5053, keep HTTP
+        if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+          // Keep as HTTP - MetaMask will allow it
+        } else {
+          // On production (ding.fish), force HTTPS
+          rpcUrl = rpcUrl.replace('http://', 'https://')
+        }
       }
       
       const params = {
         chainId: '0x1B58', // 7000 in hex
-        chainName: 'Ritual Chain (Shrinenet)',
+        chainName: 'Ritual Chain',
         nativeCurrency: {
           name: 'Ritual',
           symbol: 'RITUAL',
@@ -98,19 +103,21 @@ export function ConnectWalletButton() {
         blockExplorerUrls: ['https://ding.fish'],
       }
       
-      console.log('Adding network with params:', params)
+      console.log('Adding network:', params)
       
       await window.ethereum?.request({
         method: 'wallet_addEthereumChain',
         params: [params],
       })
       
-      console.log('Ritual Network added to MetaMask')
+      console.log('Network added successfully')
     } catch (error: any) {
       console.error('Failed to add network:', error)
-      // If HTTPS failed, try with HTTP (for localhost/dev)
-      if (error?.message?.includes('HTTPS')) {
-        alert('MetaMask requires HTTPS RPC URLs. Please use an HTTPS endpoint in Settings or add the network manually.')
+      if (error?.code === 4001) {
+        // User rejected - that's fine
+        console.log('User cancelled network addition')
+      } else {
+        alert(`Failed to add network: ${error?.message || 'Unknown error'}. The warnings shown are normal for custom networks.`)
       }
     } finally {
       setAddingNetwork(false)

@@ -223,7 +223,6 @@ class RealtimeWebSocketManager {
       this.ws = new WebSocket(wsUrl)
       
       this.ws.onopen = () => {
-        console.log(`✅ [${this.connectionId}] WebSocket connected`)
         this.isConnected = true
         this.reconnectAttemps = 0
         this.reconnectInterval = 1000
@@ -231,7 +230,7 @@ class RealtimeWebSocketManager {
         // Subscribe to new block headers (transactions will be extracted from blocks)
         this.subscribeToBlocks()
         
-        // **FIX**: Trigger initial cache population for pages already loaded
+        // Trigger initial cache population for pages already loaded
         setTimeout(() => {
           this.forceRefresh('blocks')
           this.forceRefresh('mempool')
@@ -255,7 +254,10 @@ class RealtimeWebSocketManager {
       }
  
       this.ws.onclose = (event) => {
-        console.log(`🔌 [${this.connectionId}] WebSocket disconnected:`, event.code, event.reason)
+        // Only log unexpected closures (not normal disconnects)
+        if (event.code !== 1000 && event.code !== 1001) {
+          console.log(`WebSocket disconnected (code: ${event.code})`)
+        }
         this.isConnected = false
         this.scheduleReconnect()
       }
