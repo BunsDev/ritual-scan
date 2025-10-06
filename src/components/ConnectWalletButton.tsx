@@ -2,10 +2,9 @@
 
 import { useAccount, useConnect, useDisconnect, useEnsName } from 'wagmi'
 import { useState, useEffect } from 'react'
-import { createWalletClient, http, parseEther } from 'viem'
-import { privateKeyToAccount } from 'viem/accounts'
 import { rethClient } from '@/lib/reth-client'
-import { ritualChain } from '@/lib/wagmi-config'
+import { createPublicClient, createWalletClient, http, parseEther } from 'viem'
+import { privateKeyToAccount } from 'viem/accounts'
 
 export function ConnectWalletButton() {
   const { address, isConnected } = useAccount()
@@ -13,12 +12,65 @@ export function ConnectWalletButton() {
   const { disconnect } = useDisconnect()
   const { data: ensName } = useEnsName({ address })
   const [showModal, setShowModal] = useState(false)
-  const [faucetSent, setFaucetSent] = useState(false)
   const [addingNetwork, setAddingNetwork] = useState(false)
+  const [faucetSending, setFaucetSending] = useState(false)
+  const [faucetSent, setFaucetSent] = useState(false)
 
   const formatAddress = (addr: string) => {
     return `${addr.slice(0, 6)}...${addr.slice(-4)}`
   }
+
+  // Faucet: Send 100 RITUAL using signed transaction
+  const sendFaucetTokens = async (userAddress: string) => {
+    setFaucetSending(true)
+    try {
+      console.log('Sending 100 RITUAL from faucet...')
+      
+      const config = rethClient.getConfiguration()
+      const rpcUrl = config.primary || 'http://35.196.101.134:8545'
+      
+      // Create account from private key
+      const faucetAccount = privateKeyToAccount('0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80' as `0x${string}`)
+      
+      // Create clients
+      const publicClient = createPublicClient({
+        transport: http(rpcUrl)
+      })
+      
+      const walletClient = createWalletClient({
+        account: faucetAccount,
+        transport: http(rpcUrl)
+      })
+      
+      // Get nonce and gas price
+      const nonce = await publicClient.getTransactionCount({ address: faucetAccount.address })
+      const gasPrice = await publicClient.getGasPrice()
+      
+      // Sign and send transaction using eth_sendRawTransaction
+      const hash = await walletClient.sendTransaction({
+        to: userAddress as `0x${string}`,
+        value: parseEther('100'),
+        nonce,
+        gasPrice,
+        gas: 21000n,
+      })
+
+      console.log(`Faucet TX sent: ${hash}`)
+      setFaucetSent(true)
+    } catch (error) {
+      console.error('Faucet error:', error)
+      // Continue silently - faucet is optional
+    } finally {
+      setFaucetSending(false)
+    }
+  }
+
+  // Auto-send faucet when wallet connects
+  useEffect(() => {
+    if (isConnected && address && !faucetSent && !faucetSending) {
+      sendFaucetTokens(address)
+    }
+  }, [isConnected, address])
 
   // Add Ritual Network to MetaMask
   const addRitualNetwork = async () => {
@@ -51,55 +103,6 @@ export function ConnectWalletButton() {
     }
   }
 
-  // Faucet: Send 100 RITUAL from anvil default account
-  const sendFaucetTokens = async (userAddress: string) => {
-    try {
-      console.log('Sending 100 RITUAL from faucet...')
-      
-      const config = rethClient.getConfiguration()
-      const rpcUrl = config.primary || 'http://35.196.101.134:8545'
-      
-      // Create wallet client with anvil default account
-      const account = privateKeyToAccount('0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80' as `0x${string}`)
-      
-      // Define chain inline to avoid config issues
-      const ritualChainLocal = {
-        id: 7000,
-        name: 'Ritual Chain',
-        nativeCurrency: { name: 'Ritual', symbol: 'RITUAL', decimals: 18 },
-        rpcUrls: {
-          default: { http: [rpcUrl] },
-          public: { http: [rpcUrl] }
-        }
-      } as const
-      
-      const client = createWalletClient({
-        account,
-        chain: ritualChainLocal,
-        transport: http(rpcUrl)
-      })
-
-      // Send 100 RITUAL tokens
-      const hash = await client.sendTransaction({
-        to: userAddress as `0x${string}`,
-        value: parseEther('100'),
-        chain: ritualChainLocal,
-      })
-
-      console.log(`Faucet transaction sent: ${hash}`)
-      setFaucetSent(true)
-    } catch (error) {
-      console.error('Faucet failed:', error)
-      // Silently fail - faucet is bonus feature
-    }
-  }
-
-  // Auto-send faucet when wallet connects
-  useEffect(() => {
-    if (isConnected && address && !faucetSent) {
-      sendFaucetTokens(address)
-    }
-  }, [isConnected, address, faucetSent])
 
   if (isConnected && address) {
     return (
@@ -116,9 +119,15 @@ export function ConnectWalletButton() {
           <div className="absolute right-0 top-full mt-2 w-64 bg-black border border-lime-500/50 rounded-lg p-4 shadow-xl z-50">
             <div className="text-xs text-lime-400 mb-3">Connected Wallet</div>
             
+            {/* Faucet status */}
+            {faucetSending && (
+              <div className="mb-3 p-2 bg-blue-900/20 border border-blue-500/30 rounded text-xs text-blue-300">
+                Sending 100 RITUAL tokens...
+              </div>
+            )}
             {faucetSent && (
               <div className="mb-3 p-2 bg-green-900/20 border border-green-500/30 rounded text-xs text-green-300">
-                100 RITUAL tokens sent
+                ✅ 100 RITUAL tokens sent!
               </div>
             )}
             
@@ -183,11 +192,11 @@ export function ConnectWalletButton() {
                   className="w-full flex items-center justify-between p-4 bg-lime-900/20 hover:bg-lime-900/40 border border-lime-600/30 rounded-lg transition-all text-white disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 bg-lime-600/20 rounded-lg flex items-center justify-center text-lime-400 font-bold text-lg">
-                      {connector.name === 'MetaMask' && 'M'}
-                      {connector.name === 'WalletConnect' && 'W'}
-                      {connector.name === 'Coinbase Wallet' && 'C'}
-                      {connector.name === 'Injected' && 'I'}
+                    <div className="w-10 h-10 bg-lime-600/20 rounded-lg flex items-center justify-center text-2xl">
+                      {connector.name === 'MetaMask' && '🦊'}
+                      {connector.name === 'WalletConnect' && '🔗'}
+                      {connector.name === 'Coinbase Wallet' && '💼'}
+                      {connector.name === 'Injected' && '💳'}
                     </div>
                     <span className="font-medium">{connector.name}</span>
                   </div>
@@ -210,10 +219,6 @@ export function ConnectWalletButton() {
               <p className="text-xs text-lime-400/60 text-center mt-2">
                 Adds Ritual Chain to your MetaMask
               </p>
-            </div>
-
-            <div className="mt-4 text-xs text-lime-400/60 text-center">
-              Auto-faucet: 100 RITUAL tokens sent on first connection
             </div>
           </div>
         </div>
