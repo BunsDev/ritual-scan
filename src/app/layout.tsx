@@ -5,6 +5,8 @@ import { Providers } from "@/components/providers";
 import { Toaster } from "@/components/ui/sonner";
 import { BackgroundAudio } from "@/components/BackgroundAudio";
 import { ParticleToggleSimple } from "@/components/ParticleToggleSimple";
+import { WagmiProviderWrapper } from "@/components/WagmiProviderWrapper";
+import { WalletButtonFixed } from "@/components/WalletButtonFixed";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -79,12 +81,15 @@ export default function RootLayout({
       <body
         className={`${inter.variable} ${jetbrainsMono.variable} font-sans antialiased bg-black`}
       >
-        <Providers>
-          {children}
-          <BackgroundAudio />
-          <ParticleToggleSimple />
-          <Toaster />
-        </Providers>
+        <WagmiProviderWrapper>
+          <Providers>
+            {children}
+            <WalletButtonFixed />
+            <BackgroundAudio />
+            <ParticleToggleSimple />
+            <Toaster />
+          </Providers>
+        </WagmiProviderWrapper>
       </body>
     </html>
   );
