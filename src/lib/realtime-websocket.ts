@@ -3,7 +3,7 @@
 import { rethClient } from './reth-client'
 
 export interface RealtimeUpdate {
-  type: 'newBlock' | 'newTransaction' | 'newPendingTransaction' | 'gasPriceUpdate' | 'mempoolUpdate' | 'scheduledUpdate'
+  type: 'newBlock' | 'newTransaction' | 'newPendingTransaction' | 'gasPriceUpdate' | 'mempoolUpdate' | 'scheduledUpdate' | 'validatorPeersUpdate'
   data: any
   timestamp: number
 }
@@ -25,6 +25,9 @@ class RealtimeWebSocketManager {
   private latestMempoolStats: any = {}
   private latestScheduledTxs: any[] = []
   private latestAsyncCommitments: any[] = []
+  private validatorPeers: any[] = []
+  private validatorPeersLastUpdate: number = 0
+  private validatorPeersPollInterval: number = 60000 // Start with 1 minute
   // Per-page expanding windows (CAPPED at 1000 blocks per page - persists while user stays on page)
   private pageBlockWindows: Map<string, any[]> = new Map()
   private reconnectAttemps = 0
@@ -38,6 +41,7 @@ class RealtimeWebSocketManager {
   private lastTransactionHashes = new Set<string>()
   private mempoolCheckInterval: NodeJS.Timeout | null = null
   private blockCheckInterval: NodeJS.Timeout | null = null
+  private validatorPeersInterval: NodeJS.Timeout | null = null
   private lastLocalStorageSave: number = 0
   private pendingStorageSave: NodeJS.Timeout | null = null
   
@@ -522,6 +526,98 @@ class RealtimeWebSocketManager {
     }
   }
 
+  // Fetch validator peer list from Summit node
+  private async fetchValidatorPeers() {
+    try {
+      const config = rethClient.getConfiguration()
+      const rpcUrl = config.primary || 'http://35.196.202.163:8545'
+      
+      // Extract IP from RPC URL (Summit node IP)
+      const summitIp = rpcUrl.match(/https?:\/\/([^:]+)/)?.[1] || '35.196.202.163'
+      const peerListUrl = `http://${summitIp}:3030/get_peer_list`
+      
+      this.log(`🔍 [${this.connectionId}] Fetching validator peers from ${peerListUrl}`)
+      
+      const response = await fetch(peerListUrl, {
+        signal: AbortSignal.timeout(5000)
+      })
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`)
+      }
+      
+      const data = await response.json()
+      const peers = data.validators || []
+      
+      // Check if data changed
+      const dataChanged = JSON.stringify(peers) !== JSON.stringify(this.validatorPeers)
+      
+      if (dataChanged) {
+        this.log(`✅ [${this.connectionId}] Validator peers updated: ${peers.length} peers`)
+        this.validatorPeers = peers
+        this.validatorPeersLastUpdate = Date.now()
+        
+        // Data changed - poll more frequently (1 minute)
+        this.validatorPeersPollInterval = 60000
+        
+        // Fetch GeoIP data for each peer
+        await this.enrichPeersWithGeoIP()
+        
+        // Notify subscribers
+        const validatorUpdate: RealtimeUpdate = {
+          type: 'validatorPeersUpdate' as any,
+          data: this.validatorPeers,
+          timestamp: Date.now()
+        }
+        this.notifyCallbacks(validatorUpdate)
+      } else {
+        // No change - poll less frequently (5 minutes)
+        this.validatorPeersPollInterval = 300000
+        this.log(`📍 [${this.connectionId}] No peer changes, extending poll to 5 minutes`)
+      }
+      
+    } catch (error) {
+      console.error(`❌ [${this.connectionId}] Failed to fetch validator peers:`, error)
+    }
+  }
+
+  // Enrich peer list with GeoIP data
+  private async enrichPeersWithGeoIP() {
+    const enrichedPeers = []
+    
+    for (const peer of this.validatorPeers) {
+      try {
+        // Use ip-api.com (free, no API key needed, allows batch)
+        const geoResponse = await fetch(`http://ip-api.com/json/${peer.ip_address}?fields=status,country,city,lat,lon`, {
+          signal: AbortSignal.timeout(3000)
+        })
+        
+        if (geoResponse.ok) {
+          const geoData = await geoResponse.json()
+          if (geoData.status === 'success') {
+            enrichedPeers.push({
+              ...peer,
+              lat: geoData.lat,
+              lon: geoData.lon,
+              city: geoData.city,
+              country: geoData.country,
+              isReal: true
+            })
+          }
+        }
+      } catch (error) {
+        // GeoIP failed, keep peer without location
+        enrichedPeers.push({ ...peer, isReal: false })
+      }
+      
+      // Rate limit: 45 requests per minute for ip-api.com free tier
+      await new Promise(resolve => setTimeout(resolve, 1500))
+    }
+    
+    this.validatorPeers = enrichedPeers
+    this.logImportant(`🌍 [${this.connectionId}] Enriched ${enrichedPeers.filter(p => p.isReal).length}/${enrichedPeers.length} peers with GeoIP data`)
+  }
+
   private startHighFrequencyPolling() {
     // High-frequency mempool polling (every 2 seconds)
     this.mempoolCheckInterval = setInterval(async () => {
@@ -556,6 +652,17 @@ class RealtimeWebSocketManager {
         console.error(`❌ [${this.connectionId}] High-frequency polling error:`, error)
       }
     }, 2000) // Every 2 seconds
+    
+    // Validator peers polling (dynamic interval: 1-5 minutes)
+    const pollValidatorPeers = async () => {
+      await this.fetchValidatorPeers()
+      
+      // Schedule next poll with dynamic interval
+      this.validatorPeersInterval = setTimeout(pollValidatorPeers, this.validatorPeersPollInterval)
+    }
+    
+    // Start initial fetch
+    pollValidatorPeers()
 
     // Block polling as backup (every 2 seconds)
     this.blockCheckInterval = setInterval(async () => {
@@ -631,6 +738,14 @@ class RealtimeWebSocketManager {
 
   getCachedMempoolStats(): any {
     return { ...this.latestMempoolStats }
+  }
+  
+  getCachedValidatorPeers(): any[] {
+    return [...this.validatorPeers]
+  }
+  
+  getValidatorPeersLastUpdate(): number {
+    return this.validatorPeersLastUpdate
   }
 
   // Per-page expanding window management
@@ -740,6 +855,11 @@ class RealtimeWebSocketManager {
     if (this.blockCheckInterval) {
       clearInterval(this.blockCheckInterval)
       this.blockCheckInterval = null
+    }
+    
+    if (this.validatorPeersInterval) {
+      clearTimeout(this.validatorPeersInterval)
+      this.validatorPeersInterval = null
     }
 
     if (this.ws) {
