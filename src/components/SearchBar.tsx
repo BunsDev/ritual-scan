@@ -659,7 +659,7 @@ export default function SearchBar() {
                       {(suggestion.type === 'address' || suggestion.type === 'validator') && suggestion.metadata.balance !== undefined && (
                         <div className="text-xs">
                           <span className="text-lime-300/60">Balance: </span>
-                          <span className="text-white/80 font-mono">{(parseInt(suggestion.metadata.balance, 16) / 1e18).toFixed(4)} ETH</span>
+                          <span className="text-white/80 font-mono">{(parseInt(suggestion.metadata.balance, 16) / 1e18).toFixed(4)} RITUAL</span>
                         </div>
                       )}
                       {suggestion.type === 'block' && suggestion.metadata.timestamp && (
