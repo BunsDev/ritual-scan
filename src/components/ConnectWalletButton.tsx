@@ -72,32 +72,46 @@ export function ConnectWalletButton() {
     }
   }, [isConnected, address])
 
-  // Add Ritual Network to MetaMask
+  // Add Ritual Network to MetaMask  
   const addRitualNetwork = async () => {
     setAddingNetwork(true)
     try {
       const config = rethClient.getConfiguration()
-      const rpcUrl = config.primary || 'http://35.196.101.134:8545'
+      let rpcUrl = config.primary || 'http://35.196.101.134:8545'
+      
+      // MetaMask requires HTTPS for security, but allows HTTP for localhost
+      // For production, convert HTTP to HTTPS if not localhost
+      if (rpcUrl.startsWith('http://') && !rpcUrl.includes('localhost') && !rpcUrl.includes('127.0.0.1')) {
+        // Try HTTPS version (most public RPC nodes support both)
+        rpcUrl = rpcUrl.replace('http://', 'https://')
+      }
+      
+      const params = {
+        chainId: '0x1B58', // 7000 in hex
+        chainName: 'Ritual Chain (Shrinenet)',
+        nativeCurrency: {
+          name: 'Ritual',
+          symbol: 'RITUAL',
+          decimals: 18,
+        },
+        rpcUrls: [rpcUrl],
+        blockExplorerUrls: ['https://ding.fish'],
+      }
+      
+      console.log('Adding network with params:', params)
       
       await window.ethereum?.request({
         method: 'wallet_addEthereumChain',
-        params: [
-          {
-            chainId: '0x1B58', // 7000 in hex
-            chainName: 'Ritual Chain (Shrinenet)',
-            nativeCurrency: {
-              name: 'Ritual',
-              symbol: 'RITUAL',
-              decimals: 18,
-            },
-            rpcUrls: [rpcUrl], // Must be array
-            blockExplorerUrls: ['https://ding.fish'],
-          },
-        ],
+        params: [params],
       })
-      console.log('✅ Ritual Network added to MetaMask')
-    } catch (error) {
+      
+      console.log('Ritual Network added to MetaMask')
+    } catch (error: any) {
       console.error('Failed to add network:', error)
+      // If HTTPS failed, try with HTTP (for localhost/dev)
+      if (error?.message?.includes('HTTPS')) {
+        alert('MetaMask requires HTTPS RPC URLs. Please use an HTTPS endpoint in Settings or add the network manually.')
+      }
     } finally {
       setAddingNetwork(false)
     }
