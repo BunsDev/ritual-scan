@@ -30,9 +30,12 @@ export async function GET(request: NextRequest) {
     
     const data = await response.json()
     
-    console.log(`[Validator Peers API] Got ${data.validators?.length || 0} peers`)
+    // Normalize response format (might be 'peers' or 'validators')
+    const peers = data.peers || data.validators || []
     
-    return NextResponse.json(data)
+    console.log(`[Validator Peers API] Got ${peers.length} peers`)
+    
+    return NextResponse.json({ validators: peers })
     
   } catch (error: any) {
     console.error('[Validator Peers API] Error:', error.message)

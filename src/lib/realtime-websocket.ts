@@ -583,8 +583,11 @@ class RealtimeWebSocketManager {
     
     for (const peer of this.validatorPeers) {
       try {
+        // Strip port from IP address (format: "1.2.3.4:27656" → "1.2.3.4")
+        const ipOnly = peer.ip_address?.split(':')[0] || peer.ip_address
+        
         // Use ip-api.com (free, no API key needed, allows batch)
-        const geoResponse = await fetch(`http://ip-api.com/json/${peer.ip_address}?fields=status,country,city,lat,lon`, {
+        const geoResponse = await fetch(`http://ip-api.com/json/${ipOnly}?fields=status,country,city,lat,lon`, {
           signal: AbortSignal.timeout(3000)
         })
         
