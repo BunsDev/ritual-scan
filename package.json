@@ -22,9 +22,9 @@
   "homepage": "https://ritual-scan.vercel.app",
   "private": false,
   "scripts": {
-    "dev": "next dev --turbopack -p 5051",
+    "dev": "next dev --turbopack -p 5555",
     "build": "next build --turbopack",
-    "start": "next start -p 5051",
+    "start": "next start -p 5555",
     "lint": "eslint",
     "lint:fix": "eslint --fix",
     "type-check": "tsc --noEmit",

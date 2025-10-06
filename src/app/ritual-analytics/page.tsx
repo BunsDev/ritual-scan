@@ -176,21 +176,32 @@ export default function RitualAnalyticsPage() {
       let recentBlocks: any[] = []
       let source: 'cache' | 'api' = 'api'
       
-      // Check for accumulated data first
+      // OPTIMIZED: Check caches in priority order: global cache → per-page window → API
       if (manager) {
-        const pageWindowBlocks = manager.getPageBlockWindow('ritual-analytics')
-        console.log(`[Ritual Analytics] Checking per-page window: found ${pageWindowBlocks.length} blocks`)
+        // Priority 1: Check global cache (500 blocks accumulated in background)
+        const globalCachedBlocks = manager.getCachedBlocks()
+        console.log(`📊 [Ritual Analytics] Global cache has ${globalCachedBlocks.length} blocks`)
         
-        if (pageWindowBlocks.length > 0) {
-          console.log(`[Ritual Analytics] Using ${pageWindowBlocks.length} accumulated blocks!`)
-          recentBlocks = pageWindowBlocks
+        if (globalCachedBlocks.length > 0) {
+          console.log(`🚀 [Ritual Analytics] Using ${globalCachedBlocks.length} blocks from GLOBAL cache (instant load!)`)
+          recentBlocks = globalCachedBlocks
           source = 'cache'
+        } else {
+          // Priority 2: Check per-page window (accumulated from previous visit)
+          const pageWindowBlocks = manager.getPageBlockWindow('ritual-analytics')
+          console.log(`[Ritual Analytics] Checking per-page window: found ${pageWindowBlocks.length} blocks`)
+          
+          if (pageWindowBlocks.length > 0) {
+            console.log(`[Ritual Analytics] Using ${pageWindowBlocks.length} accumulated blocks from previous session!`)
+            recentBlocks = pageWindowBlocks
+            source = 'cache'
+          }
         }
       }
       
-      // Fetch fresh if no cache
+      // Priority 3: No cache - fetch fresh data (only on first ever visit)
       if (recentBlocks.length === 0) {
-        console.log('🔍 Loading real analytics data from API...')
+        console.log('🔍 [Ritual Analytics] First visit with no cache - fetching 100 full blocks for initial load')
         recentBlocks = await rethClient.getRecentBlocks(100) // Analyze more blocks for better stats
         source = 'api'
       }

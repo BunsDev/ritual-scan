@@ -279,34 +279,43 @@ export default function AnalyticsPage() {
         console.log(`📊 [Analytics] No manager available (SSR?)`)
       }
       
-      // PHASE 3: Check if we have accumulated data from previous visit
+      // OPTIMIZED: Check caches in priority order: global cache → per-page window → API
       if (manager) {
-        const pageWindowBlocks = manager.getPageBlockWindow('analytics')
-        console.log(`📊 [Analytics] Checking per-page window: found ${pageWindowBlocks.length} blocks`)
+        // Priority 1: Check global cache (500 blocks accumulated in background)
+        const globalCachedBlocks = manager.getCachedBlocks()
+        console.log(`📊 [Analytics] Global cache has ${globalCachedBlocks.length} blocks`)
         
-        if (pageWindowBlocks.length > 0) {
-          // User returning - use accumulated data!
-          console.log(`📊 [Analytics] Found ${pageWindowBlocks.length} accumulated blocks from previous session!`)
-          
-          // DEBUG: Check if accumulated blocks have full data
-          const sampleBlock = pageWindowBlocks[0]
-          const hasTxs = Array.isArray(sampleBlock.transactions) && sampleBlock.transactions.length > 0
-          const hasSize = sampleBlock.size && sampleBlock.size !== '0x0'
-          console.log(`  Sample block from cache: txs=${hasTxs ? sampleBlock.transactions.length : 0}, size=${sampleBlock.size || '0x0'}`)
-          
-          recentBlocks = pageWindowBlocks
+        if (globalCachedBlocks.length > 0) {
+          console.log(`🚀 [Analytics] Using ${globalCachedBlocks.length} blocks from GLOBAL cache (instant load!)`)
+          recentBlocks = globalCachedBlocks
           source = 'cache'
+        } else {
+          // Priority 2: Check per-page window (accumulated from previous visit)
+          const pageWindowBlocks = manager.getPageBlockWindow('analytics')
+          console.log(`📊 [Analytics] Checking per-page window: found ${pageWindowBlocks.length} blocks`)
           
-          // Show message if we accumulated a lot while they were away
-          if (pageWindowBlocks.length > 100) {
-            console.log(`🎉 [Analytics] Extended dataset: ${pageWindowBlocks.length} blocks accumulated in background!`)
+          if (pageWindowBlocks.length > 0) {
+            console.log(`📊 [Analytics] Found ${pageWindowBlocks.length} accumulated blocks from previous session!`)
+            
+            // DEBUG: Check if accumulated blocks have full data
+            const sampleBlock = pageWindowBlocks[0]
+            const hasTxs = Array.isArray(sampleBlock.transactions) && sampleBlock.transactions.length > 0
+            const hasSize = sampleBlock.size && sampleBlock.size !== '0x0'
+            console.log(`  Sample block from cache: txs=${hasTxs ? sampleBlock.transactions.length : 0}, size=${sampleBlock.size || '0x0'}`)
+            
+            recentBlocks = pageWindowBlocks
+            source = 'cache'
+            
+            if (pageWindowBlocks.length > 100) {
+              console.log(`🎉 [Analytics] Extended dataset: ${pageWindowBlocks.length} blocks accumulated in background!`)
+            }
           }
         }
       }
       
-      // First visit or no cache - fetch fresh data
+      // Priority 3: No cache - fetch fresh data (only on first ever visit before cache builds)
       if (recentBlocks.length === 0) {
-        console.log(`📊 [Analytics] First visit - fetching 50 full blocks for initial load`)
+        console.log(`📊 [Analytics] First visit with no cache - fetching 50 full blocks for initial load`)
         recentBlocks = await rethClient.getRecentBlocks(50)
         source = 'api'
       }
