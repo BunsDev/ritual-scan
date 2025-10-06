@@ -12,7 +12,7 @@ data:
     
     :443 {
         # Proxy all requests to RPC WebSocket node
-        reverse_proxy 35.196.101.134:8546 {
+        reverse_proxy 35.196.202.163:8546 {
             header_up Host {upstream_hostport}
             header_up Upgrade {http.request.header.Upgrade}
             header_up Connection {http.request.header.Connection}

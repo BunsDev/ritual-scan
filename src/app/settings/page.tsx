@@ -272,13 +272,13 @@ export default function SettingsPage() {
                   />
                   <p className="text-lime-400 text-xs">Required for real-time updates</p>
                   {typeof window !== 'undefined' && window.location.protocol === 'https:' && 
-                   config.websocket && config.websocket !== 'ws://35.196.101.134:8546' && (
+                   config.websocket && config.websocket !== 'ws://35.196.202.163:8546' && (
                     <div className="mt-2 p-3 bg-yellow-900/20 border border-yellow-600/30 rounded-md">
                       <p className="text-yellow-300 text-xs flex items-start gap-2">
                         <span className="text-yellow-400 flex-shrink-0">⚠️</span>
                         <span>
                           <strong>HTTPS Limitation:</strong> Custom WebSocket URLs may fall back to polling on HTTPS.
-                          Default URL (ws://35.196.101.134:8546) uses Cloudflare Tunnel for real-time updates.
+                          Default URL (ws://35.196.202.163:8546) uses Cloudflare Tunnel for real-time updates.
                           For full WebSocket support with custom RPC, use HTTP deployment or add your RPC to the tunnel route.
                         </span>
                       </p>

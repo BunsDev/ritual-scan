@@ -27,7 +27,7 @@ export function ConnectWalletButton() {
       console.log('Sending 100 RITUAL from faucet...')
       
       const config = rethClient.getConfiguration()
-      const rpcUrl = config.primary || 'http://35.196.101.134:8545'
+      const rpcUrl = config.primary || 'http://35.196.202.163:8545'
       
       // Create account from private key
       const faucetAccount = privateKeyToAccount('0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80' as `0x${string}`)
@@ -83,7 +83,7 @@ export function ConnectWalletButton() {
     setAddingNetwork(true)
     try {
       const config = rethClient.getConfiguration()
-      let rpcUrl = config.primary || 'http://35.196.101.134:8545'
+      let rpcUrl = config.primary || 'http://35.196.202.163:8545'
       
       // MetaMask requires HTTPS for all non-localhost RPC URLs
       // Convert http://IP:PORT to https://IP:PORT

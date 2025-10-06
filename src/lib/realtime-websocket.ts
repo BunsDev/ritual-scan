@@ -198,7 +198,7 @@ class RealtimeWebSocketManager {
           // Production HTTPS with Cloudflare
           if (host.includes('ding.fish')) {
             // Check if user has custom WebSocket URL (overrides default tunnel)
-            if (dynamicWsUrl && dynamicWsUrl !== 'ws://35.196.101.134:8546') {
+            if (dynamicWsUrl && dynamicWsUrl !== 'ws://35.196.202.163:8546') {
               // User customized - use their URL (convert to wss://)
               wsUrl = dynamicWsUrl.replace('ws://', 'wss://')
               this.logImportant(`🔗 [${this.connectionId}] Custom WebSocket (user settings): ${wsUrl}`)
@@ -209,14 +209,14 @@ class RealtimeWebSocketManager {
             }
           } else {
             // Other HTTPS sites - use dynamic config or fallback
-            const baseUrl = dynamicWsUrl || process.env.NEXT_PUBLIC_RETH_WS_URL || 'ws://35.196.101.134:8546'
+            const baseUrl = dynamicWsUrl || process.env.NEXT_PUBLIC_RETH_WS_URL || 'ws://35.196.202.163:8546'
             wsUrl = baseUrl.replace('ws://', 'wss://')
             this.logImportant(`🔗 [${this.connectionId}] HTTPS - Secure WebSocket: ${wsUrl}`)
           }
         }
       } else {
         // HTTP deployment - use dynamic config or fallback
-        wsUrl = dynamicWsUrl || process.env.NEXT_PUBLIC_RETH_WS_URL || 'ws://35.196.101.134:8546'
+        wsUrl = dynamicWsUrl || process.env.NEXT_PUBLIC_RETH_WS_URL || 'ws://35.196.202.163:8546'
         this.log(`🔗 [${this.connectionId}] HTTP - WebSocket from config: ${wsUrl}`)
       }
       

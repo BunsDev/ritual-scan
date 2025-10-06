@@ -27,9 +27,9 @@ spec:
         - name: NEXT_PUBLIC_DEFAULT_CHAIN
           value: "ethereum"
         - name: NEXT_PUBLIC_RETH_RPC_URL
-          value: "http://35.196.101.134:8545"
+          value: "http://35.196.202.163:8545"
         - name: NEXT_PUBLIC_RETH_WS_URL
-          value: "ws://35.196.101.134:8546"
+          value: "ws://35.196.202.163:8546"
         envFrom:
         - secretRef:
             name: ritual-explorer-secrets

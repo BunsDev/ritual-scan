@@ -116,15 +116,15 @@ export class RETHClient {
 
   constructor(initialConfig?: RpcConfig) {
     const defaultConfig: RpcConfig = {
-      primary: process.env.NEXT_PUBLIC_RETH_RPC_URL || 'http://35.196.101.134:8545',
-      websocket: process.env.NEXT_PUBLIC_RETH_WS_URL || 'ws://35.196.101.134:8546',
+      primary: process.env.NEXT_PUBLIC_RETH_RPC_URL || 'http://35.196.202.163:8545',
+      websocket: process.env.NEXT_PUBLIC_RETH_WS_URL || 'ws://35.196.202.163:8546',
       name: 'Default RETH'
     }
     
     this.config = initialConfig || defaultConfig
     this.rpcUrl = this.config.primary
     this.backupRpcUrl = this.config.backup || this.config.primary
-    this.wsUrl = this.config.websocket || 'ws://35.196.101.134:8546'
+    this.wsUrl = this.config.websocket || 'ws://35.196.202.163:8546'
     
     // Load from localStorage if available
     if (typeof window !== 'undefined') {
@@ -145,7 +145,7 @@ export class RETHClient {
     this.config = { ...newConfig }
     this.rpcUrl = this.config.primary
     this.backupRpcUrl = this.config.backup || this.config.primary
-    this.wsUrl = this.config.websocket || 'ws://35.196.101.134:8546'
+    this.wsUrl = this.config.websocket || 'ws://35.196.202.163:8546'
     
     if (persist && typeof window !== 'undefined') {
       localStorage.setItem('reth-client-config', JSON.stringify(this.config))
