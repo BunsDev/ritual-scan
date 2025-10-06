@@ -29,28 +29,32 @@ export function ConnectWalletButton() {
       const config = rethClient.getConfiguration()
       const rpcUrl = config.primary || 'http://35.196.202.163:8545'
       
+      // On HTTPS, use /api/rpc-proxy to avoid mixed content
+      const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:'
+      const proxyUrl = isHttps && rpcUrl.startsWith('http://') ? '/api/rpc-proxy' : rpcUrl
+      
       // Create account from private key
       const faucetAccount = privateKeyToAccount('0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80' as `0x${string}`)
       
-      // Create clients
+      // Create clients (will use proxy if needed)
       const publicClient = createPublicClient({
-        transport: http(rpcUrl)
+        transport: http(proxyUrl)
       })
       
       const walletClient = createWalletClient({
         account: faucetAccount,
-        transport: http(rpcUrl)
+        transport: http(proxyUrl)
       })
       
       // Get LATEST nonce (including pending transactions)
       const nonce = await publicClient.getTransactionCount({ 
         address: faucetAccount.address,
-        blockTag: 'pending' // Include pending txs to avoid nonce conflicts
+        blockTag: 'pending'
       })
       
-      console.log(`Using nonce: ${nonce} for faucet account`)
+      console.log(`Using nonce: ${nonce} for faucet`)
       
-      // Sign and send transaction using eth_sendRawTransaction
+      // Sign and send transaction
       const hash = await walletClient.sendTransaction({
         to: userAddress as `0x${string}`,
         value: parseEther('100'),
@@ -63,10 +67,7 @@ export function ConnectWalletButton() {
       setFaucetSent(true)
     } catch (error: any) {
       console.error('Faucet error:', error)
-      if (error?.message?.includes('nonce')) {
-        console.log('Nonce error - faucet may have sent multiple transactions. Transaction might still succeed.')
-      }
-      // Continue silently - faucet is optional
+      // Silently fail - faucet is bonus feature
     } finally {
       setFaucetSending(false)
     }
