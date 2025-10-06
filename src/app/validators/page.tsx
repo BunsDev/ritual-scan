@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { rethClient } from '@/lib/reth-client'
 import { Navigation } from '@/components/Navigation'
-import { ValidatorNetworkMap } from '@/components/ValidatorNetworkMap'
+import { ValidatorWorldMap } from '@/components/ValidatorWorldMap'
 import { getRealtimeManager } from '@/lib/realtime-websocket'
 import Link from 'next/link'
 import { useParticleBackground } from '@/hooks/useParticleBackground'
@@ -412,9 +412,9 @@ export default function ValidatorsPage() {
           </div>
         )}
 
-        {/* Network Topology Map */}
+        {/* World Map */}
         {!loading && !error && validators.length > 0 && (
-          <ValidatorNetworkMap validators={validators} />
+          <ValidatorWorldMap validators={validators} />
         )}
 
         {/* Validators Table */}
