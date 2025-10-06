@@ -116,11 +116,30 @@ export default function AddressPage() {
     try {
       setTxLoading(true)
       
-      // Get recent blocks and search for transactions involving this address
-      const recentBlocks = await rethClient.getRecentBlocks(50)
+      console.log(`Loading transactions for address: ${address}`)
+      
+      // Check WebSocket manager cache first (has up to 500 blocks!)
+      const manager = (typeof window !== 'undefined' && (window as any).__realtimeManager) 
+        ? (window as any).__realtimeManager 
+        : null
+      
+      let blocksToSearch: any[] = []
+      
+      if (manager) {
+        const cachedBlocks = manager.getCachedBlocks ? manager.getCachedBlocks() : []
+        console.log(`Found ${cachedBlocks.length} blocks in cache`)
+        blocksToSearch = cachedBlocks
+      }
+      
+      // If no cache, fetch recent blocks
+      if (blocksToSearch.length === 0) {
+        console.log('No cache, fetching recent blocks...')
+        blocksToSearch = await rethClient.getRecentBlocks(100) // Increased from 50
+      }
+      
       const addressTransactions: Transaction[] = []
 
-      for (const block of recentBlocks) {
+      for (const block of blocksToSearch) {
         if (block.transactions && Array.isArray(block.transactions)) {
           for (const tx of block.transactions) {
             if (tx.from?.toLowerCase() === address.toLowerCase() || 
@@ -135,17 +154,19 @@ export default function AddressPage() {
                 value: tx.value ? (parseInt(tx.value, 16) / 1e18).toFixed(6) : '0',
                 gasUsed: tx.gas ? parseInt(tx.gas, 16).toString() : undefined,
                 gasPrice: tx.gasPrice ? (parseInt(tx.gasPrice, 16) / 1e9).toFixed(2) : undefined,
-                status: 'success' // We'll assume success for now
+                status: 'success'
               })
             }
           }
         }
       }
 
+      console.log(`Found ${addressTransactions.length} transactions for address`)
+      
       // Sort by timestamp descending
       addressTransactions.sort((a, b) => b.timestamp - a.timestamp)
       
-      setTransactions(addressTransactions.slice(0, 20)) // Show first 20
+      setTransactions(addressTransactions.slice(0, 50)) // Show first 50
     } catch (error: any) {
       console.error('Error loading transactions:', error)
     } finally {
