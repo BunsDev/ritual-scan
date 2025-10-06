@@ -42,23 +42,29 @@ export function ConnectWalletButton() {
         transport: http(rpcUrl)
       })
       
-      // Get nonce and gas price
-      const nonce = await publicClient.getTransactionCount({ address: faucetAccount.address })
-      const gasPrice = await publicClient.getGasPrice()
+      // Get LATEST nonce (including pending transactions)
+      const nonce = await publicClient.getTransactionCount({ 
+        address: faucetAccount.address,
+        blockTag: 'pending' // Include pending txs to avoid nonce conflicts
+      })
+      
+      console.log(`Using nonce: ${nonce} for faucet account`)
       
       // Sign and send transaction using eth_sendRawTransaction
       const hash = await walletClient.sendTransaction({
         to: userAddress as `0x${string}`,
         value: parseEther('100'),
         nonce,
-        gasPrice,
         gas: 21000n,
       })
 
       console.log(`Faucet TX sent: ${hash}`)
       setFaucetSent(true)
-    } catch (error) {
+    } catch (error: any) {
       console.error('Faucet error:', error)
+      if (error?.message?.includes('nonce')) {
+        console.log('Nonce error - faucet may have sent multiple transactions. Transaction might still succeed.')
+      }
       // Continue silently - faucet is optional
     } finally {
       setFaucetSending(false)
@@ -126,6 +132,20 @@ export function ConnectWalletButton() {
     }
   }
 
+
+  // Prevent hydration mismatch
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  if (!mounted) {
+    return (
+      <button className="px-3 py-1.5 bg-lime-600 text-white rounded-md text-xs font-medium">
+        Connect Wallet
+      </button>
+    )
+  }
 
   if (isConnected && address) {
     return (

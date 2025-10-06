@@ -71,15 +71,25 @@ export function ValidatorWorldMap({ validators }: ValidatorWorldMapProps) {
 
   return (
     <div className="bg-gradient-to-br from-lime-900/10 to-black border border-lime-500/20 rounded-lg p-6 mb-8">
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h3 className="text-lg font-semibold text-white">Validator Geospatial Distribution</h3>
-          <p className="text-sm text-lime-300">
-            {validators.length} active validators across {validatorRegions.length} regions
-          </p>
+      <div className="mb-4">
+        <div className="flex items-center justify-between mb-2">
+          <div>
+            <h3 className="text-lg font-semibold text-white">Validator Geospatial Distribution</h3>
+            <p className="text-sm text-lime-300">
+              {validators.length} active validators across {validatorRegions.length} regions
+            </p>
+          </div>
+          <div className="text-xs text-lime-400 bg-lime-900/20 px-3 py-1 rounded-full border border-lime-500/30">
+            {validators.length} nodes • Full mesh topology
+          </div>
         </div>
-        <div className="text-xs text-lime-400 bg-lime-900/20 px-3 py-1 rounded-full border border-lime-500/30">
-          {validators.length} nodes • Full mesh topology
+        <div className="p-3 bg-red-900/20 border border-red-500/30 rounded-md">
+          <p className="text-xs text-red-300">
+            <span className="font-semibold">⚠️ SIMULATED GEOGRAPHIC DATA:</span> Locations are placeholder distribution across typical datacenter regions. 
+            Validator blockchain addresses (from block.miner) have NO geographic information. 
+            Real locations require admin_peers RPC or consensus layer P2P access to get validator IP addresses, then GeoIP lookup.
+            This is a visual approximation only. See VALIDATOR_IP_DISCOVERY.md for details.
+          </p>
         </div>
       </div>
       

@@ -256,6 +256,7 @@ export default function RitualAnalyticsPage() {
                 const lastByte = parseInt(toAddr.slice(-2), 16)
                 if (lastByte >= 1 && lastByte <= 255) {
                   precompileUsage[tx.to] = (precompileUsage[tx.to] || 0) + 1
+                  console.log(`Found precompile: ${tx.to} (count: ${precompileUsage[tx.to]})`)
                 }
               }
             }
@@ -320,7 +321,9 @@ export default function RitualAnalyticsPage() {
         totalTransactions,
         asyncAdoptionRate: asyncAdoptionRate.toFixed(2) + '%',
         activeScheduledJobs,
-        totalProtocolFees: totalProtocolFees.toFixed(2)
+        totalProtocolFees: totalProtocolFees.toFixed(2),
+        precompileCount: Object.keys(precompileUsage).length,
+        precompileDetails: precompileUsage
       })
       
       setAnalytics(realAnalytics)
