@@ -101,4 +101,8 @@ echo "   Logs:    kubectl logs -l app=$DEPLOYMENT_NAME --tail=100 -f"
 echo "   Pods:    kubectl get pods -l app=$DEPLOYMENT_NAME"
 echo "   Restart: kubectl rollout restart deployment/$DEPLOYMENT_NAME"
 echo ""
+echo "📚 Documentation:"
+echo "   Cloudflare: docs/deployment/CLOUDFLARE.md"
+echo "   Deployment: docs/deployment/DEPLOY_TO_DING_FISH.md"
+echo ""
 

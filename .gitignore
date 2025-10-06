@@ -1,15 +1,11 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-
-# dependencies
-/node_modules
-/.pnp
-.pnp.*
-.yarn/*
-!.yarn/# Dependencies
+# Dependencies
 /node_modules
 /.pnp
 .pnp.js
+.pnp.*
+.yarn/*
 .yarn/install-state.gz
+!.yarn/releases
 
 # Production builds
 /.next/
@@ -19,9 +15,9 @@
 
 # Environment files (keep examples)
 .env*.local
-.env.production
 !.env.example
 !.env.gke.template
+!.env.production
 
 # Testing
 /coverage

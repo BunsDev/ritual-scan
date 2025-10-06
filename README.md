@@ -349,40 +349,28 @@ gcloud run services update ritual-scan \
 
 ```
 ritual-scan/
-├── src/
-│   ├── app/                    # Next.js App Router pages
-│   │   ├── (pages)/           # Main application pages
-│   │   │   ├── blocks/        # Block explorer
-│   │   │   ├── transactions/  # Transaction feed
-│   │   │   ├── validators/    # Validator statistics
-│   │   │   ├── mempool/       # Mempool monitoring
-│   │   │   ├── scheduled/     # Scheduled transactions
-│   │   │   └── ritual-analytics/ # Ritual-specific analytics
-│   │   ├── api/               # API routes
-│   │   └── globals.css        # Global styles
-│   ├── components/            # Reusable UI components
-│   │   ├── ui/               # shadcn/ui components
-│   │   ├── blocks/           # Block-related components
-│   │   ├── transactions/     # Transaction components
-│   │   └── layout/           # Layout components
-│   ├── lib/                  # Core utilities and clients
-│   │   ├── reth-client.ts    # Enhanced RETH client
-│   │   ├── realtime-websocket.ts # WebSocket manager
-│   │   ├── transaction-decoder.ts # TX type detection
-│   │   └── utils.ts          # Helper utilities
-│   ├── hooks/                # Custom React hooks
-│   │   ├── useRealtime.ts    # WebSocket integration
-│   │   └── useBlockchain.ts  # Blockchain data hooks
-│   └── types/                # TypeScript definitions
+├── src/                      # Application source code
+│   ├── app/                  # Next.js App Router pages
+│   ├── components/           # React components
+│   ├── hooks/                # Custom hooks
+│   └── lib/                  # Core libraries (reth-client, websocket manager)
 ├── docs/                     # Documentation
-│   ├── screenshots/          # UI screenshots
-│   ├── DEPLOYMENT.md         # Deployment guide
-│   └── environment.md        # Environment setup
+│   ├── admin/                # Admin API docs
+│   ├── architecture/         # Architecture decisions
+│   ├── deployment/           # Deployment guides
+│   └── *.md                  # System design, development logs
+├── k8s/                      # Kubernetes manifests
 ├── scripts/                  # Build and deployment scripts
-│   └── Makefile             # Production deployment
-├── k8s/                     # Kubernetes manifests
-├── tests/                   # Playwright E2E tests
-└── tools/                   # Development utilities
+├── tools/                    # Development utilities
+│   ├── debug/                # Debug scripts
+│   └── test/                 # Test scripts
+├── tests/                    # Playwright E2E tests
+├── archive/                  # Old configs and scripts
+├── public/                   # Static assets
+├── FRONTEND_ONBOARDING.md    # Start here for new engineers
+├── README.md                 # This file
+├── deploy-to-ding-fish.sh    # Production deployment
+└── package.json              # Dependencies
 ```
 
 ## Contributing
