@@ -1,0 +1,48 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - generic [ref=e4]:
+    - generic [ref=e5]:
+      - heading "Ritual Chain Explorer" [level=1] [ref=e6]
+      - paragraph [ref=e7]: Enter password to access the explorer
+    - generic [ref=e8]:
+      - generic [ref=e9]:
+        - generic [ref=e10]: Password
+        - textbox "Password" [ref=e11]
+      - button "Access Explorer" [ref=e12]
+    - generic [ref=e13]: Ritual Chain • Blockchain Explorer
+  - generic [ref=e14]:
+    - button "Play anninimouse" [ref=e15]:
+      - img [ref=e16]
+    - generic:
+      - generic:
+        - generic: anninimouse
+        - generic: Background Theme
+        - generic: ⏸️ Paused
+      - generic:
+        - generic:
+          - generic: Volume
+          - generic: 15%
+        - slider: "0.15"
+      - generic:
+        - button "Mute"
+        - button "Default"
+        - button "Loud"
+  - button "📊" [ref=e21]
+  - button "Disable particle background" [ref=e24]:
+    - img [ref=e25]
+  - region "Notifications alt+T"
+  - generic [ref=e33] [cursor=pointer]:
+    - button "Open Next.js Dev Tools" [ref=e34] [cursor=pointer]:
+      - img [ref=e35] [cursor=pointer]
+    - generic [ref=e38] [cursor=pointer]:
+      - button "Open issues overlay" [ref=e39] [cursor=pointer]:
+        - generic [ref=e40] [cursor=pointer]:
+          - generic [ref=e41] [cursor=pointer]: "0"
+          - generic [ref=e42] [cursor=pointer]: "1"
+        - generic [ref=e43] [cursor=pointer]: Issue
+      - button "Collapse issues badge" [ref=e44] [cursor=pointer]:
+        - img [ref=e45] [cursor=pointer]
+  - alert [ref=e47]
+```
