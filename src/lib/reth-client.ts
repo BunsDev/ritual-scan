@@ -182,7 +182,12 @@ export class RETHClient {
         id: Date.now()
       }
 
-      const response = await fetch(rpcUrl, {
+      // Use proxy if on HTTPS to avoid mixed content errors
+      const isBrowser = typeof window !== 'undefined'
+      const isHttps = isBrowser && window.location.protocol === 'https:'
+      const targetUrl = (isBrowser && isHttps && rpcUrl.startsWith('http://')) ? '/api/rpc-proxy' : rpcUrl
+
+      const response = await fetch(targetUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
