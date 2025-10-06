@@ -57,14 +57,18 @@ export function ValidatorActivityHistogram({ validators }: ValidatorActivityHist
                 size: 10
               },
               marker: {
-                color: blockCounts.map((count, i) => {
-                  // Gradient from purple (most active) to lime (least active)
+                color: blockCounts.map((count) => {
+                  // Gradient from bright lime (most active) to dark lime/black (least active)
                   const intensity = count / Math.max(...blockCounts)
-                  return `rgba(${139 + (163 - 139) * (1 - intensity)}, ${92 + (230 - 92) * (1 - intensity)}, ${246 - (246 - 53) * (1 - intensity)}, 0.8)`
+                  // Bright lime (#a3e635) to dark lime (#4d7c0f) to almost black
+                  const r = Math.round(163 * intensity + 40 * (1 - intensity))
+                  const g = Math.round(230 * intensity + 80 * (1 - intensity))
+                  const b = Math.round(53 * intensity + 15 * (1 - intensity))
+                  return `rgba(${r}, ${g}, ${b}, ${0.7 + intensity * 0.3})`
                 }),
                 line: {
                   color: '#a3e635',
-                  width: 1
+                  width: 1.5
                 }
               },
               hovertemplate: 
@@ -127,7 +131,7 @@ export function ValidatorActivityHistogram({ validators }: ValidatorActivityHist
       <div className="mt-4 flex items-center justify-between text-xs text-lime-400">
         <div className="flex items-center space-x-4">
           <div className="flex items-center space-x-2">
-            <div className="w-3 h-3 bg-gradient-to-r from-purple-500 to-lime-400 rounded"></div>
+            <div className="w-3 h-3 bg-gradient-to-r from-lime-400 to-lime-900 rounded"></div>
             <span>Color intensity = block production volume</span>
           </div>
         </div>

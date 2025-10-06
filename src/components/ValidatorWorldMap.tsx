@@ -73,7 +73,7 @@ export function ValidatorWorldMap({ validators }: ValidatorWorldMapProps) {
     <div className="bg-gradient-to-br from-lime-900/10 to-black border border-lime-500/20 rounded-lg p-6 mb-8">
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h3 className="text-lg font-semibold text-white">Validator Network - Global Distribution</h3>
+          <h3 className="text-lg font-semibold text-white">Validator Geospatial Distribution</h3>
           <p className="text-sm text-lime-300">
             {validators.length} active validators across {validatorRegions.length} regions
           </p>
@@ -126,18 +126,6 @@ export function ValidatorWorldMap({ validators }: ValidatorWorldMapProps) {
               </radialGradient>
             </defs>
             
-            {/* Grid lines for lat/lon reference */}
-            <g stroke="rgba(163, 230, 53, 0.15)" strokeWidth="0.8" opacity="0.6">
-              {/* Latitude lines */}
-              {[100, 200, 300].map(y => (
-                <line key={`lat-${y}`} x1="0" y1={y} x2={mapWidth} y2={y} strokeDasharray="3,3" />
-              ))}
-              {/* Longitude lines */}
-              {[200, 400, 600, 800].map(x => (
-                <line key={`lon-${x}`} x1={x} y1="0" x2={x} y2={mapHeight * 0.85} strokeDasharray="3,3" />
-              ))}
-            </g>
-
           {/* Connection lines (subtle, sample connections) */}
           <g id="connections" opacity="0.3">
             {validatorLocations.slice(0, 20).map((source, i) => {
@@ -273,31 +261,6 @@ export function ValidatorWorldMap({ validators }: ValidatorWorldMapProps) {
             </div>
           </div>
         )}
-      </div>
-
-      <div className="mt-3 flex items-center justify-between text-xs text-lime-400">
-        <div className="flex items-center space-x-4">
-          <div className="flex items-center space-x-2">
-            <div className="w-3 h-3 rounded-full bg-lime-400 shadow-lg shadow-lime-400/50"></div>
-            <span>Validator node (size = blocks proposed)</span>
-          </div>
-          <div className="flex items-center space-x-2">
-            <div className="w-8 h-0.5 bg-lime-400/20"></div>
-            <span>P2P connections (Summit BFT)</span>
-          </div>
-        </div>
-        <div className="text-lime-300/60">
-          Hover over nodes for details
-        </div>
-      </div>
-      
-      {/* Warning about placeholder data */}
-      <div className="mt-4 p-3 bg-yellow-900/20 border border-yellow-600/20 rounded-md">
-        <p className="text-xs text-yellow-300">
-          <span className="font-semibold">⚠️ Placeholder Distribution:</span> Geographic positions use typical datacenter regions. 
-          Real validator IPs require <code className="bg-black/40 px-1 rounded">admin_peers</code> RPC method or consensus layer access.
-          See <code className="bg-black/40 px-1 rounded">VALIDATOR_IP_DISCOVERY.md</code> for implementation details.
-        </p>
       </div>
     </div>
   )
