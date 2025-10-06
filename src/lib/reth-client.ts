@@ -185,11 +185,21 @@ export class RETHClient {
       // Use proxy if on HTTPS to avoid mixed content errors
       const isBrowser = typeof window !== 'undefined'
       const isHttps = isBrowser && window.location.protocol === 'https:'
-      const targetUrl = (isBrowser && isHttps && rpcUrl.startsWith('http://')) ? '/api/rpc-proxy' : rpcUrl
+      const useProxy = isBrowser && isHttps && rpcUrl.startsWith('http://')
+      const targetUrl = useProxy ? '/api/rpc-proxy' : rpcUrl
+      
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json'
+      }
+      
+      // Send RPC URL to proxy via header
+      if (useProxy) {
+        headers['x-rpc-url'] = rpcUrl
+      }
 
       const response = await fetch(targetUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(payload),
         signal: AbortSignal.timeout(5000) // 5 second timeout
       })
@@ -225,17 +235,25 @@ export class RETHClient {
     const isHttps = isBrowser && window.location.protocol === 'https:'
     
     // Use proxy for browser HTTPS to avoid mixed content errors
-    const targetUrl = (isBrowser && isHttps) ? '/api/rpc-proxy' : this.rpcUrl
+    const useProxy = isBrowser && isHttps
+    const targetUrl = useProxy ? '/api/rpc-proxy' : this.rpcUrl
 
     try {
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), 10000) // 10s timeout
       
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      }
+      
+      // Send actual RPC URL to proxy via header (for dynamic settings)
+      if (useProxy) {
+        headers['x-rpc-url'] = this.rpcUrl
+      }
+      
       const response = await fetch(targetUrl, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
         body: JSON.stringify(payload),
         signal: controller.signal
       })

@@ -8,7 +8,12 @@ import { NextRequest, NextResponse } from 'next/server'
  */
 export async function POST(request: NextRequest) {
   try {
-    const rpcUrl = process.env.NEXT_PUBLIC_RETH_RPC_URL || process.env.NEXT_PUBLIC_RETH_HTTP_URL
+    // Get the JSON-RPC request from the browser
+    const rpcRequest = await request.json()
+    
+    // Allow client to specify RPC URL via header (for dynamic settings)
+    const clientRpcUrl = request.headers.get('x-rpc-url')
+    const rpcUrl = clientRpcUrl || process.env.NEXT_PUBLIC_RETH_RPC_URL || process.env.NEXT_PUBLIC_RETH_HTTP_URL
     
     if (!rpcUrl) {
       console.error('❌ [RPC-Proxy] No RPC URL configured')
@@ -17,9 +22,6 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       )
     }
-
-    // Get the JSON-RPC request from the browser
-    const rpcRequest = await request.json()
     
     console.log(`📡 [RPC-Proxy] Forwarding request: ${rpcRequest.method} (ID: ${rpcRequest.id})`)
     
