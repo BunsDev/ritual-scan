@@ -117,7 +117,7 @@ export default function RitualAnalyticsPage() {
       
       if (blockNumber <= latestBlockRef.current) return
       
-      console.log(`📊 [Ritual Analytics] New block #${blockNumber} - fetching full data...`)
+      console.log(`[Ritual Analytics] New block #${blockNumber} - fetching full data...`)
       
       const fullBlock = await rethClient.getBlock(blockNumber, true)
       if (!fullBlock) return
@@ -179,10 +179,10 @@ export default function RitualAnalyticsPage() {
       // Check for accumulated data first
       if (manager) {
         const pageWindowBlocks = manager.getPageBlockWindow('ritual-analytics')
-        console.log(`📊 [Ritual Analytics] Checking per-page window: found ${pageWindowBlocks.length} blocks`)
+        console.log(`[Ritual Analytics] Checking per-page window: found ${pageWindowBlocks.length} blocks`)
         
         if (pageWindowBlocks.length > 0) {
-          console.log(`📊 [Ritual Analytics] Using ${pageWindowBlocks.length} accumulated blocks!`)
+          console.log(`[Ritual Analytics] Using ${pageWindowBlocks.length} accumulated blocks!`)
           recentBlocks = pageWindowBlocks
           source = 'cache'
         }
@@ -311,7 +311,7 @@ export default function RitualAnalyticsPage() {
         recentActivity: recentActivity.reverse() // Most recent first
       }
       
-      console.log('📈 Computed real analytics:', {
+      console.log('Computed real analytics:', {
         totalTransactions,
         asyncAdoptionRate: asyncAdoptionRate.toFixed(2) + '%',
         activeScheduledJobs,
@@ -370,7 +370,7 @@ export default function RitualAnalyticsPage() {
               )}
               {dataSource === 'cache' && !isLive && (
                 <span className="px-3 py-1 text-sm font-medium text-white bg-blue-600/20 border border-blue-500/30 rounded-full">
-                  ⚡ From Cache
+                  From Cache
                 </span>
               )}
               {lastUpdateTime && (
@@ -406,7 +406,7 @@ export default function RitualAnalyticsPage() {
                     <p className="text-2xl font-bold text-white">{formatPercentage(analytics.asyncAdoptionRate)}</p>
                   </div>
                   <div className="w-12 h-12 bg-lime-500/20 rounded-lg flex items-center justify-center">
-                    <span className="text-lime-300 text-xl">⚡</span>
+                    <div className="w-6 h-6 bg-lime-400 rounded-md"></div>
                   </div>
                 </div>
                 <p className="text-xs text-lime-300/80 mt-2">
@@ -436,7 +436,7 @@ export default function RitualAnalyticsPage() {
                     <p className="text-2xl font-bold text-white">{analytics.avgSettlementTime} blocks</p>
                   </div>
                   <div className="w-12 h-12 bg-orange-500/20 rounded-lg flex items-center justify-center">
-                    <span className="text-orange-300 text-xl">⏱️</span>
+                    <div className="w-6 h-6 bg-orange-400 rounded-full"></div>
                   </div>
                 </div>
                 <p className="text-xs text-lime-300/80 mt-2">
@@ -451,7 +451,7 @@ export default function RitualAnalyticsPage() {
                     <p className="text-2xl font-bold text-white">{formatTokenAmount(analytics.totalProtocolFees)}</p>
                   </div>
                   <div className="w-12 h-12 bg-green-500/20 rounded-lg flex items-center justify-center">
-                    <span className="text-green-300 text-xl">💰</span>
+                    <div className="w-6 h-6 bg-green-400 rounded-lg"></div>
                   </div>
                 </div>
                 <p className="text-xs text-lime-300/80 mt-2">
@@ -467,12 +467,12 @@ export default function RitualAnalyticsPage() {
                 {Object.entries(analytics.transactionTypeDistribution).map(([type, count]) => (
                   <div key={type} className="text-center">
                     <div className="w-16 h-16 mx-auto mb-2 bg-lime-500/20 rounded-lg flex items-center justify-center">
-                      <span className="text-lime-300 text-2xl">
-                        {type.includes('Legacy') ? '📜' :
-                         type.includes('EIP-1559') ? '🆕' :
-                         type.includes('Scheduled') ? '🔄' :
-                         type.includes('AsyncCommitment') ? '📋' : '✅'}
-                      </span>
+                      <div className="text-xs px-2 py-1 rounded-full bg-lime-900/30 text-lime-300 font-medium">
+                        {type.includes('Legacy') ? 'LEG' :
+                         type.includes('EIP-1559') ? 'NEW' :
+                         type.includes('Scheduled') ? 'SCHED' :
+                         type.includes('AsyncCommitment') ? 'COMMIT' : 'STD'}
+                      </div>
                     </div>
                     <p className="text-sm font-medium text-white">{formatNumber(count)}</p>
                     <p className="text-xs text-lime-400">{type}</p>
@@ -568,7 +568,7 @@ export default function RitualAnalyticsPage() {
                 
                 <div className="text-center">
                   <div className="w-16 h-16 mx-auto mb-3 bg-orange-500/20 rounded-lg flex items-center justify-center">
-                    <span className="text-orange-300 text-2xl">📋</span>
+                    <div className="w-8 h-8 bg-orange-400 rounded"></div>
                   </div>
                   <h4 className="text-lime-300 font-medium">Commitment System</h4>
                   <p className="text-xs text-lime-400 mb-2">0x...fa8e</p>
