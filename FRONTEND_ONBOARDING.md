@@ -34,47 +34,48 @@ This reduced our Charts/Stats page load from 5-20s to under 100ms by eliminating
 
 ```
 ritual-scan/
-├── src/
-│   ├── app/                      # Next.js App Router pages
-│   │   ├── page.tsx             # Homepage (dashboard)
-│   │   ├── blocks/page.tsx      # Block explorer
-│   │   ├── transactions/page.tsx # Transaction feed
-│   │   ├── analytics/page.tsx   # Charts (OPTIMIZED)
-│   │   ├── ritual-analytics/    # Stats (OPTIMIZED)
-│   │   ├── validators/page.tsx  # Validator map
-│   │   ├── mempool/page.tsx     # Live mempool
-│   │   ├── scheduled/page.tsx   # Scheduled transactions
-│   │   ├── async/page.tsx       # Async transactions
-│   │   ├── settings/page.tsx    # RPC configuration
-│   │   ├── address/[address]/   # Address details
-│   │   ├── block/[number]/      # Block details
-│   │   ├── tx/[hash]/           # Transaction details
-│   │   └── api/
-│   │       └── rpc-proxy/       # HTTPS→HTTP RPC proxy
-│   │
-│   ├── components/              # React components
-│   │   ├── Navigation.tsx       # Main nav bar
-│   │   ├── ConnectWalletButton.tsx  # Wallet integration
-│   │   ├── SearchBar.tsx        # Search with Call ID support
-│   │   ├── ValidatorWorldMap.tsx    # D3 world map
-│   │   └── ui/                  # Radix UI components
-│   │
-│   ├── lib/                     # Core libraries
-│   │   ├── reth-client.ts       # RPC client wrapper
-│   │   ├── realtime-websocket.ts # WebSocket manager (important)
-│   │   └── wagmi-config.ts      # Wallet configuration
-│   │
-│   ├── hooks/                   # Custom React hooks
-│   │   ├── useParticleBackground.ts
-│   │   └── useRealtimeTier1.ts
-│   │
-│   └── types/                   # TypeScript types
+├── src/                          # Application source
+│   ├── app/                      # Next.js pages (App Router)
+│   │   ├── page.tsx              # Homepage
+│   │   ├── analytics/            # Charts (cache-optimized)
+│   │   ├── ritual-analytics/     # Stats (cache-optimized)
+│   │   ├── blocks/               # Block explorer
+│   │   ├── transactions/         # Transaction feed
+│   │   ├── validators/           # Validator map
+│   │   ├── mempool/              # Live mempool
+│   │   ├── scheduled/            # Scheduled transactions
+│   │   ├── async/                # Async transactions
+│   │   ├── settings/             # RPC configuration
+│   │   ├── address/[address]/    # Address details
+│   │   ├── block/[number]/       # Block details
+│   │   ├── tx/[hash]/            # Transaction details
+│   │   └── api/rpc-proxy/        # HTTPS→HTTP proxy
+│   ├── components/               # React components
+│   ├── lib/                      # Core libraries (reth-client, websocket manager)
+│   ├── hooks/                    # Custom React hooks
+│   └── types/                    # TypeScript types
 │
-├── k8s/                         # Kubernetes manifests
-├── public/                      # Static assets
-├── .env.local                   # Local dev env (NOT committed)
-├── .env.production              # Production env (committed - no secrets)
-└── deploy-to-ding-fish.sh      # Production deployment script
+├── docs/                         # Documentation
+│   ├── admin/                    # Admin API docs
+│   ├── architecture/             # Technical architecture
+│   ├── deployment/               # Deployment guides
+│   └── *.md                      # System design, dev logs
+│
+├── k8s/                          # Kubernetes manifests
+├── scripts/                      # Build/deploy scripts
+├── tools/                        # Dev utilities
+│   ├── debug/                    # Debug scripts
+│   ├── test/                     # Test scripts
+│   └── test-results/             # Test outputs
+├── tests/                        # Playwright E2E tests
+├── archive/                      # Old configs/scripts
+│
+├── FRONTEND_ONBOARDING.md        # Start here
+├── README.md                     # Project overview
+├── deploy-to-ding-fish.sh        # Production deploy
+├── package.json                  # Dependencies
+├── .env.local                    # Local dev (not committed)
+└── .env.production               # Production (committed)
 ```
 
 ## Design Decisions
