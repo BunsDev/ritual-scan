@@ -248,10 +248,15 @@ export default function RitualAnalyticsPage() {
               legacyTxs++ // Default to legacy for simple tx hashes
             }
             
-            // Track precompile usage (simplified - checking transaction 'to' field)
+            // Track precompile usage (precompiles are 0x00...0001 through 0x00...00FF)
             if (typeof tx === 'object' && tx.to) {
-              if (tx.to.startsWith('0x000000000000000000000000000000000000080')) {
-                precompileUsage[tx.to] = (precompileUsage[tx.to] || 0) + 1
+              const toAddr = tx.to.toLowerCase()
+              // Check if it's a precompile address (0x0000...0000[01-ff])
+              if (toAddr.startsWith('0x00000000000000000000000000000000000000') && toAddr.length === 42) {
+                const lastByte = parseInt(toAddr.slice(-2), 16)
+                if (lastByte >= 1 && lastByte <= 255) {
+                  precompileUsage[tx.to] = (precompileUsage[tx.to] || 0) + 1
+                }
               }
             }
           }
@@ -525,9 +530,15 @@ export default function RitualAnalyticsPage() {
               <div className="bg-white/5 border border-lime-500/20 rounded-lg p-6">
                 <h3 className="text-lg font-medium text-white mb-4">Top Precompiles</h3>
                 <div className="space-y-3">
-                  {Object.entries(analytics.precompileUsage)
-                    .sort(([,a], [,b]) => b - a)
-                    .map(([address, usage]) => (
+                  {Object.keys(analytics.precompileUsage).length === 0 ? (
+                    <div className="text-center py-8 text-lime-400/60">
+                      <p className="text-sm">No precompile usage detected</p>
+                      <p className="text-xs mt-1">Precompiles are special contracts at addresses 0x01-0xFF</p>
+                    </div>
+                  ) : (
+                    Object.entries(analytics.precompileUsage)
+                      .sort(([,a], [,b]) => b - a)
+                      .map(([address, usage]) => (
                       <div key={address} className="flex items-center justify-between">
                         <div>
                           <Link 
@@ -547,7 +558,8 @@ export default function RitualAnalyticsPage() {
                           <p className="text-xs text-lime-400">calls</p>
                         </div>
                       </div>
-                    ))}
+                    ))
+                  )}
                 </div>
               </div>
             </div>
