@@ -352,8 +352,8 @@ export function ValidatorWorldMap({ validators }: ValidatorWorldMapProps) {
                     />
                   </circle>
                   
-                  {/* Block count label */}
-                  {validator.blocksProposed > 5 && (
+                  {/* Percentage label */}
+                  {validator.percentage >= 1 && (
                     <text
                       x={pos.x}
                       y={pos.y - size - 8}
@@ -363,7 +363,7 @@ export function ValidatorWorldMap({ validators }: ValidatorWorldMapProps) {
                       fontWeight="bold"
                       style={{ textShadow: '0 0 3px rgba(0,0,0,0.8)' }}
                     >
-                      {validator.blocksProposed}
+                      {Math.round(validator.percentage)}%
                     </text>
                   )}
                 </g>
