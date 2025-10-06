@@ -350,16 +350,6 @@ export default function HomePage() {
         {/* Price Banner */}
         <div className="bg-white/5 border-b border-lime-500/20">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-            <div className="flex flex-wrap items-center justify-between text-sm">
-              <div className="flex items-center space-x-6">
-                <div className="text-lime-300">
-                  RITUAL Price: <span className="text-white font-medium">Higher</span>
-                </div>
-                <div className="text-lime-300">
-                  Gas: <span className="text-white font-medium">{initialLoading ? '...' : `${stats.gasPrice} Gwei`}</span>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
 
