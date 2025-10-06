@@ -12,9 +12,12 @@ const NAV_ITEMS = [
   { href: '/mempool', label: 'Mempool', key: 'mempool' },
   { href: '/scheduled', label: 'Scheduled', key: 'scheduled' },
   { href: '/async', label: 'Async', key: 'async' },
-  { href: '/analytics', label: 'Charts', key: 'analytics' },
-  { href: '/ritual-analytics', label: 'Stats', key: 'ritual-analytics' },
   { href: '/settings', label: 'Settings', key: 'settings' },
+] as const
+
+const ANALYTICS_ITEMS = [
+  { href: '/charts', label: 'Charts', key: 'charts' },
+  { href: '/stats', label: 'Stats', key: 'stats' },
 ] as const
 
 export function Navigation({ currentPage }: NavigationProps) {
@@ -52,6 +55,40 @@ export function Navigation({ currentPage }: NavigationProps) {
                 </a>
               )
             ))}
+            
+            {/* Analytics Dropdown */}
+            <div className="relative group">
+              <button 
+                className={`${
+                  currentPage === 'charts' || currentPage === 'stats'
+                    ? 'relative text-white bg-lime-500/10 border border-lime-500/30 rounded-lg px-4 py-2.5 text-sm font-medium shadow-lg'
+                    : 'text-lime-300/90 hover:text-white hover:bg-white/5 rounded-lg px-4 py-2.5 text-sm font-medium transition-all duration-200 hover:shadow-md border border-transparent hover:border-lime-500/20'
+                } flex items-center gap-1`}
+              >
+                Analytics
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              <div className="absolute right-0 top-full mt-2 w-40 bg-black/95 border border-lime-500/20 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                <div className="py-2">
+                  {ANALYTICS_ITEMS.map((item) => (
+                    <Link 
+                      key={item.key}
+                      href={item.href}
+                      prefetch={false}
+                      className={`block px-4 py-2 text-sm transition-colors ${
+                        currentPage === item.key
+                          ? 'text-white bg-lime-500/10 font-medium'
+                          : 'text-lime-300 hover:text-white hover:bg-lime-500/10'
+                      }`}
+                    >
+                      {item.label}
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            </div>
           </nav>
 
           {/* Medium Screen Navigation */}
@@ -75,6 +112,41 @@ export function Navigation({ currentPage }: NavigationProps) {
                 </Link>
               )
             ))}
+            
+            {/* Analytics Dropdown */}
+            <div className="relative group">
+              <button 
+                className={`${
+                  currentPage === 'charts' || currentPage === 'stats'
+                    ? 'text-white bg-lime-500/10 border border-lime-500/30 rounded-md px-3 py-2 text-xs font-medium'
+                    : 'text-lime-300/90 hover:text-white hover:bg-white/5 rounded-md px-3 py-2 text-xs font-medium transition-all duration-200 border border-transparent hover:border-lime-500/20'
+                } flex items-center gap-0.5`}
+              >
+                Analytics
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              <div className="absolute right-0 top-full mt-2 w-40 bg-black/95 border border-lime-500/20 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                <div className="py-2">
+                  {ANALYTICS_ITEMS.map((item) => (
+                    <Link 
+                      key={item.key}
+                      href={item.href}
+                      prefetch={false}
+                      className={`block px-4 py-2 text-sm transition-colors ${
+                        currentPage === item.key
+                          ? 'text-white bg-lime-500/10 font-medium'
+                          : 'text-lime-300 hover:text-white hover:bg-lime-500/10'
+                      }`}
+                    >
+                      {item.label}
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            </div>
+            
             {/* More Menu for remaining items */}
             <div className="relative group">
               <button className="text-lime-300/90 hover:text-white hover:bg-white/5 rounded-md px-3 py-2 text-xs font-medium transition-all duration-200 border border-transparent hover:border-lime-500/20">

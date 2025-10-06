@@ -52,6 +52,7 @@ export function ValidatorWorldMap({ validators }: ValidatorWorldMapProps) {
   const [validatorLocations, setValidatorLocations] = useState<ValidatorLocation[]>([])
   const [hoveredValidator, setHoveredValidator] = useState<ValidatorLocation | null>(null)
   const [dataSource, setDataSource] = useState<'real' | 'placeholder'>('placeholder')
+  const [latestBlockMiner, setLatestBlockMiner] = useState<string | null>(null)
 
   useEffect(() => {
     if (!validators || validators.length === 0) return
@@ -124,6 +125,28 @@ export function ValidatorWorldMap({ validators }: ValidatorWorldMapProps) {
     }
   }, [validators])
 
+  // Subscribe to new blocks to flash the latest validator
+  useEffect(() => {
+    const manager = getRealtimeManager()
+    if (!manager) return
+
+    const unsubscribe = manager.subscribe('validator-map-flash', (update) => {
+      if (update.type === 'newBlock' && update.data?.miner) {
+        const minerAddress = update.data.miner.toLowerCase()
+        setLatestBlockMiner(minerAddress)
+        
+        // Clear the flash after animation completes (1.2s)
+        setTimeout(() => {
+          setLatestBlockMiner(null)
+        }, 1200)
+      }
+    })
+
+    return () => {
+      if (unsubscribe) unsubscribe()
+    }
+  }, [])
+
   const mapWidth = 1000
   const mapHeight = 500
 
@@ -166,6 +189,28 @@ export function ValidatorWorldMap({ validators }: ValidatorWorldMapProps) {
             viewBox={`0 0 ${mapWidth} ${mapHeight * 0.85}`}
             className="absolute inset-0 w-full h-full"
           >
+            {/* CSS Animation for red flash */}
+            <style>{`
+              @keyframes flashRed {
+                0% { fill: #ef4444; }
+                20% { fill: #ef4444; }
+                40% { fill: #fbbf24; }
+                60% { fill: #ef4444; }
+                80% { fill: #fbbf24; }
+                100% { fill: #a3e635; }
+              }
+              @keyframes pulseRedGlow {
+                0%, 100% { opacity: 0.8; }
+                50% { opacity: 1; }
+              }
+              .flash-red-validator {
+                animation: flashRed 1.2s ease-in-out;
+              }
+              .flash-red-glow {
+                animation: pulseRedGlow 1.2s ease-in-out;
+              }
+            `}</style>
+            
             {/* Detailed world map background - cropped to exclude Antarctica */}
             <image 
               href="https://upload.wikimedia.org/wikipedia/commons/8/83/Equirectangular_projection_SW.jpg"
@@ -247,8 +292,10 @@ export function ValidatorWorldMap({ validators }: ValidatorWorldMapProps) {
                     cx={pos.x}
                     cy={pos.y}
                     r={size * 3}
-                    fill={`url(#glow-${index})`}
+                    fill={validator.address.toLowerCase() === latestBlockMiner ? `url(#glow-red-${index})` : `url(#glow-${index})`}
                     opacity="0.6"
+                    className={validator.address.toLowerCase() === latestBlockMiner ? 'flash-red-glow' : ''}
+                    style={{ transition: 'fill 0.1s ease-in-out' }}
                   >
                     <animate
                       attributeName="r"
@@ -265,6 +312,11 @@ export function ValidatorWorldMap({ validators }: ValidatorWorldMapProps) {
                       <stop offset="50%" stopColor="#a3e635" stopOpacity="0.4" />
                       <stop offset="100%" stopColor="#a3e635" stopOpacity="0" />
                     </radialGradient>
+                    <radialGradient id={`glow-red-${index}`}>
+                      <stop offset="0%" stopColor="#ef4444" stopOpacity="1" />
+                      <stop offset="50%" stopColor="#f97316" stopOpacity="0.6" />
+                      <stop offset="100%" stopColor="#ef4444" stopOpacity="0" />
+                    </radialGradient>
                   </defs>
                   
                   {/* Node circle */}
@@ -278,6 +330,11 @@ export function ValidatorWorldMap({ validators }: ValidatorWorldMapProps) {
                     cursor="pointer"
                     onMouseEnter={() => setHoveredValidator(validator)}
                     onMouseLeave={() => setHoveredValidator(null)}
+                    className={validator.address.toLowerCase() === latestBlockMiner ? 'flash-red-validator' : ''}
+                    style={{ 
+                      transition: 'fill 0.1s ease-in-out',
+                      willChange: validator.address.toLowerCase() === latestBlockMiner ? 'fill' : 'auto'
+                    }}
                   />
                   
                   {/* Inner pulse */}

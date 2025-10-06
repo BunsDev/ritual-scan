@@ -477,41 +477,45 @@ export default function AnalyticsPage() {
 
   return (
     <div className="min-h-screen bg-black">
-      <Navigation currentPage="analytics" />
+      <Navigation currentPage="charts" />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
+          <nav className="flex items-center space-x-2 text-sm text-lime-400 mb-4">
+            <Link href="/" className="hover:text-lime-200">Home</Link>
+            <span>→</span>
+            <span className="text-lime-300">Analytics</span>
+            <span>→</span>
+            <span className="text-white">Charts</span>
+          </nav>
+          
           <div className="flex items-center justify-between">
             <div>
-              <div className="flex items-center gap-3 mb-2">
-                <h1 className="text-4xl font-bold text-white">Charts Dashboard</h1>
-                {isLive && (
-                  <span className="px-3 py-1 text-sm font-medium text-white bg-lime-600/20 border border-lime-500/30 rounded-full flex items-center gap-2">
-                    <div className="w-2 h-2 bg-lime-400 rounded-full animate-pulse"></div>
-                    Live
-                  </span>
-                )}
-                {dataSource === 'cache' && !isLive && (
-                  <span className="px-3 py-1 text-sm font-medium text-white bg-blue-600/20 border border-blue-500/30 rounded-full">
-                    ⚡ From Cache
-                  </span>
-                )}
-              </div>
+              <h1 className="text-3xl font-bold text-white mb-2">Charts Dashboard</h1>
               <p className="text-lime-200">
                 Visual analytics from {data.blocks.length} recent blocks
-                {dataSource === 'cache' && data.blocks.length > 50 && !isLive && (
-                  <span className="text-blue-400"> • Loaded {data.blocks.length} blocks accumulated in background</span>
-                )}
-                {isLive && (
-                  <span className="text-lime-400"> • Real-time updates active</span>
-                )}
                 {data.blocks.length > 50 && (
                   <span className="text-lime-400"> • {(data.blocks.length * 2 / 60).toFixed(1)} min of history</span>
                 )}
-                {lastUpdateTime && isLive && (
-                  <span className="text-lime-300"> • Last update: {lastUpdateTime.toLocaleTimeString()}</span>
-                )}
               </p>
+            </div>
+            <div className="flex items-center space-x-4">
+              {isLive && (
+                <span className="px-3 py-1 text-sm font-medium text-white bg-lime-600/20 border border-lime-500/30 rounded-full flex items-center gap-2">
+                  <div className="w-2 h-2 bg-lime-400 rounded-full animate-pulse"></div>
+                  Live Updates
+                </span>
+              )}
+              {dataSource === 'cache' && !isLive && (
+                <span className="px-3 py-1 text-sm font-medium text-white bg-blue-600/20 border border-blue-500/30 rounded-full">
+                  From Cache
+                </span>
+              )}
+              {lastUpdateTime && (
+                <span className="text-lime-300 text-sm">
+                  Last update: {lastUpdateTime.toLocaleTimeString()}
+                </span>
+              )}
             </div>
           </div>
         </div>

@@ -359,12 +359,14 @@ export default function RitualAnalyticsPage() {
 
   return (
     <div className="min-h-screen bg-black">
-      <Navigation currentPage="ritual-analytics" />
+      <Navigation currentPage="stats" />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-6">
           <nav className="flex items-center space-x-2 text-sm text-lime-400 mb-4">
             <Link href="/" className="hover:text-lime-200">Home</Link>
+            <span>→</span>
+            <span className="text-lime-300">Analytics</span>
             <span>→</span>
             <span className="text-white">Stats</span>
           </nav>
@@ -373,8 +375,7 @@ export default function RitualAnalyticsPage() {
             <div>
               <h1 className="text-3xl font-bold text-white mb-2">Ritual Chain Stats</h1>
               <p className="text-lime-200">
-                Statistical insights from {blocksDataRef.current.length || 0} blocks • 
-                {isLive ? ' Real-time updates active' : ' Live data from RETH nodes'}
+                Statistical insights from {blocksDataRef.current.length || 0} blocks
                 {blocksDataRef.current.length > 100 && (
                   <span className="text-lime-400"> • {(blocksDataRef.current.length * 2 / 60).toFixed(1)} min of history</span>
                 )}
