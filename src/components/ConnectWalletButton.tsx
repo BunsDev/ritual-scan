@@ -51,24 +51,19 @@ export function ConnectWalletButton() {
         })
       })
       
-      // Get LATEST nonce (including pending transactions)
-      const nonce = await publicClient.getTransactionCount({ 
-        address: faucetAccount.address,
-        blockTag: 'pending'
-      })
+      // Send transaction (Viem will automatically fetch nonce)
+      console.log(`Sending 100 RITUAL to ${userAddress}...`)
+      const startTime = Date.now()
       
-      console.log(`Using nonce: ${nonce} for faucet`)
-      
-      // Sign and send transaction
       const hash = await walletClient.sendTransaction({
         to: userAddress as `0x${string}`,
         value: parseEther('100'),
-        nonce,
         gas: BigInt(21000),
         chain: null,
       })
 
-      console.log(`Faucet TX sent: ${hash}`)
+      const elapsed = Date.now() - startTime
+      console.log(`✅ Faucet TX sent in ${elapsed}ms: ${hash}`)
       
       // Mark this address as having received faucet
       const faucetKey = `faucet-sent-${userAddress.toLowerCase()}`
