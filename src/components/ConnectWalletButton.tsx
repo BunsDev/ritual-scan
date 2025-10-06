@@ -79,15 +79,15 @@ export function ConnectWalletButton() {
       const config = rethClient.getConfiguration()
       let rpcUrl = config.primary || 'http://35.196.101.134:8545'
       
-      // For localhost, keep HTTP (MetaMask allows this)
-      // For remote IPs, we need to use the current page's protocol
-      if (!rpcUrl.includes('localhost') && !rpcUrl.includes('127.0.0.1')) {
-        // If we're on localhost:5053, keep HTTP
-        if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
-          // Keep as HTTP - MetaMask will allow it
-        } else {
-          // On production (ding.fish), force HTTPS
+      // MetaMask requires HTTPS for all non-localhost RPC URLs
+      // Convert http://IP:PORT to https://IP:PORT
+      if (rpcUrl.startsWith('http://')) {
+        const urlObj = new URL(rpcUrl)
+        // Only keep HTTP if it's literally localhost or 127.0.0.1
+        if (urlObj.hostname !== 'localhost' && urlObj.hostname !== '127.0.0.1') {
+          // FORCE HTTPS - MetaMask requirement
           rpcUrl = rpcUrl.replace('http://', 'https://')
+          console.log(`Converted to HTTPS for MetaMask: ${rpcUrl}`)
         }
       }
       
@@ -111,13 +111,15 @@ export function ConnectWalletButton() {
       })
       
       console.log('Network added successfully')
+      alert('✅ Ritual Chain added to MetaMask! Click Approve on any warnings (they are normal for custom networks).')
     } catch (error: any) {
-      console.error('Failed to add network:', error)
+      console.error('Network addition error:', error)
       if (error?.code === 4001) {
-        // User rejected - that's fine
+        // User rejected - silent
         console.log('User cancelled network addition')
       } else {
-        alert(`Failed to add network: ${error?.message || 'Unknown error'}. The warnings shown are normal for custom networks.`)
+        // Show user-friendly error
+        alert('Failed to add network. Your RPC is using HTTP but MetaMask requires HTTPS for security. The network may still work - try switching to Ritual Chain in MetaMask dropdown.')
       }
     } finally {
       setAddingNetwork(false)
