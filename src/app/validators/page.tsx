@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { rethClient } from '@/lib/reth-client'
 import { Navigation } from '@/components/Navigation'
+import { ValidatorNetworkMap } from '@/components/ValidatorNetworkMap'
 import { getRealtimeManager } from '@/lib/realtime-websocket'
 import Link from 'next/link'
 import { useParticleBackground } from '@/hooks/useParticleBackground'
@@ -409,6 +410,11 @@ export default function ValidatorsPage() {
             <p className="text-lime-300/70 text-lg">Waiting for blocks via WebSocket...</p>
             <p className="text-lime-300/50 text-sm mt-2">Validator stats will appear as new blocks arrive</p>
           </div>
+        )}
+
+        {/* Network Topology Map */}
+        {!loading && !error && validators.length > 0 && (
+          <ValidatorNetworkMap validators={validators} />
         )}
 
         {/* Validators Table */}
