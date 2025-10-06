@@ -37,6 +37,11 @@ if ! kubectl cluster-info --request-timeout=5s > /dev/null 2>&1; then
     echo "✅ Authenticated"
 fi
 
+# Update Cloudflare Tunnel configuration (if credentials available)
+echo ""
+echo "🔧 Updating Cloudflare Tunnel..."
+./scripts/update-cloudflare-tunnel.sh || echo "   (Skipped - manual update required)"
+
 # Build Docker image
 echo ""
 echo "🏗️  Building Docker image..."

@@ -72,8 +72,58 @@ Ensure:
 - WebSocket uses WSS (not WS)
 - `/api/rpc-proxy` handles HTTP RPC calls
 
+## Automated Tunnel Updates
+
+The deploy script can automatically update the tunnel when RPC endpoint changes.
+
+### Setup (One-Time)
+
+1. Get your Cloudflare Account ID:
+   - Go to: https://dash.cloudflare.com
+   - Click on any zone
+   - Account ID is in the right sidebar
+
+2. Create API Token:
+   - Go to: https://dash.cloudflare.com/profile/api-tokens
+   - Create Token → Use template "Edit Cloudflare Workers"
+   - OR Custom Token with permissions:
+     - Account / Cloudflare Tunnel / Edit
+     - Zone / Zone / Read
+
+3. Set environment variables:
+   ```bash
+   export CLOUDFLARE_ACCOUNT_ID='your-account-id'
+   export CLOUDFLARE_API_TOKEN='your-api-token'
+   ```
+
+4. Add to your shell profile for persistence:
+   ```bash
+   echo 'export CLOUDFLARE_ACCOUNT_ID="your-account-id"' >> ~/.bashrc
+   echo 'export CLOUDFLARE_API_TOKEN="your-api-token"' >> ~/.bashrc
+   ```
+
+### Usage
+
+Once configured, the deploy script automatically updates the tunnel:
+
+```bash
+./deploy-to-ding-fish.sh
+# Reads NEXT_PUBLIC_RETH_WS_URL from .env.production
+# Updates Cloudflare Tunnel to point to new endpoint
+# Builds and deploys
+```
+
+Manual update (if needed):
+```bash
+./scripts/update-cloudflare-tunnel.sh ws://35.196.202.163:8546
+```
+
+Without credentials, the script prints instructions for manual update.
+
 ## Reference
 
 - Cloudflare Dashboard: https://dash.cloudflare.com
+- Tunnel Management: https://one.dash.cloudflare.com → Access → Tunnels
 - Tunnel docs: https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/
 - Current tunnel config: `k8s/cloudflared-tunnel.yaml`
+- Automation script: `scripts/update-cloudflare-tunnel.sh`
