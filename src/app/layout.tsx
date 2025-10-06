@@ -4,7 +4,6 @@ import "./globals.css";
 import { Providers } from "@/components/providers";
 import { Toaster } from "@/components/ui/sonner";
 import { BackgroundAudio } from "@/components/BackgroundAudio";
-import { PerformanceMonitor } from "@/components/PerformanceMonitor";
 import { ParticleToggleSimple } from "@/components/ParticleToggleSimple";
 
 const inter = Inter({
@@ -83,7 +82,6 @@ export default function RootLayout({
         <Providers>
           {children}
           <BackgroundAudio />
-          <PerformanceMonitor />
           <ParticleToggleSimple />
           <Toaster />
         </Providers>

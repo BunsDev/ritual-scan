@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { rethClient } from '@/lib/reth-client'
 import { Navigation } from '@/components/Navigation'
 import { ValidatorWorldMap } from '@/components/ValidatorWorldMap'
+import { ValidatorActivityHistogram } from '@/components/ValidatorActivityHistogram'
 import { getRealtimeManager } from '@/lib/realtime-websocket'
 import Link from 'next/link'
 import { useParticleBackground } from '@/hooks/useParticleBackground'
@@ -526,6 +527,11 @@ export default function ValidatorsPage() {
               Built entirely from WebSocket updates • Continuous expanding window
             </p>
           </div>
+        )}
+
+        {/* Activity Histogram */}
+        {!loading && !error && validators.length > 0 && (
+          <ValidatorActivityHistogram validators={validators} />
         )}
       </main>
     </div>

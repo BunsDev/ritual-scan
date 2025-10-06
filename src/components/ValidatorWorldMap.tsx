@@ -85,22 +85,30 @@ export function ValidatorWorldMap({ validators }: ValidatorWorldMapProps) {
       
       <div className="relative bg-black/60 rounded-lg border border-lime-500/10 overflow-hidden">
         {/* Use image overlay of world map for proper geography */}
-        <div className="relative w-full" style={{ paddingBottom: '50%' }}>
+        <div className="relative w-full" style={{ paddingBottom: '45%' }}>
           <svg
-            viewBox={`0 0 ${mapWidth} ${mapHeight}`}
+            viewBox={`0 0 ${mapWidth} ${mapHeight * 0.85}`}
             className="absolute inset-0 w-full h-full"
           >
-            {/* Detailed world map background */}
+            {/* Detailed world map background - cropped to exclude Antarctica */}
             <image 
               href="https://upload.wikimedia.org/wikipedia/commons/8/83/Equirectangular_projection_SW.jpg"
               x="0" 
-              y="0" 
+              y="-20"
               width={mapWidth} 
-              height={mapHeight}
+              height={mapHeight * 0.9}
               opacity="0.35"
               preserveAspectRatio="xMidYMid slice"
               style={{ filter: 'brightness(0.6) contrast(1.3)' }}
+              clipPath="url(#cropAntarctica)"
             />
+            
+            {/* Clip path to remove Antarctica */}
+            <defs>
+              <clipPath id="cropAntarctica">
+                <rect x="0" y="0" width={mapWidth} height={mapHeight * 0.75} />
+              </clipPath>
+            </defs>
             
             {/* Overlay to enhance continents */}
             <rect
@@ -121,12 +129,12 @@ export function ValidatorWorldMap({ validators }: ValidatorWorldMapProps) {
             {/* Grid lines for lat/lon reference */}
             <g stroke="rgba(163, 230, 53, 0.15)" strokeWidth="0.8" opacity="0.6">
               {/* Latitude lines */}
-              {[100, 200, 300, 400].map(y => (
+              {[100, 200, 300].map(y => (
                 <line key={`lat-${y}`} x1="0" y1={y} x2={mapWidth} y2={y} strokeDasharray="3,3" />
               ))}
               {/* Longitude lines */}
               {[200, 400, 600, 800].map(x => (
-                <line key={`lon-${x}`} x1={x} y1="0" x2={x} y2={mapHeight} strokeDasharray="3,3" />
+                <line key={`lon-${x}`} x1={x} y1="0" x2={x} y2={mapHeight * 0.85} strokeDasharray="3,3" />
               ))}
             </g>
 
