@@ -438,9 +438,6 @@ export default function ValidatorsPage() {
                       Blocks Proposed
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-medium text-lime-300 uppercase tracking-wider">
-                      Blocks Validated
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-lime-300 uppercase tracking-wider">
                       Activity Share
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-medium text-lime-300 uppercase tracking-wider">
@@ -486,14 +483,9 @@ export default function ValidatorsPage() {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-white font-medium">
-                          {validator.blocksValidated.toLocaleString()}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
                           <div className="text-sm text-white font-medium mr-2">
-                            {validator.stake}
+                            {validator.percentage.toFixed(2)}%
                           </div>
                           <div className="w-24 bg-lime-500/10 rounded-full h-2">
                             <div 
