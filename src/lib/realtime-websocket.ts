@@ -94,6 +94,22 @@ class RealtimeWebSocketManager {
         }
       }
       
+      // Restore validator peers (longer TTL since they change slowly)
+      const validatorPeersStored = localStorage.getItem('ritual-scan-validator-peers')
+      if (validatorPeersStored) {
+        const data = JSON.parse(validatorPeersStored)
+        const age = Date.now() - data.timestamp
+        
+        // Use validator peers if less than 10 minutes old
+        if (age < 600000 && data.peers && Array.isArray(data.peers)) {
+          this.validatorPeers = data.peers
+          this.validatorPeersLastUpdate = data.timestamp
+          this.logImportant(`💾 [${this.connectionId}] Restored ${data.peers.length} validator peers from localStorage (age: ${(age/1000).toFixed(1)}s)`)
+        } else {
+          this.log(`⏰ [${this.connectionId}] Validator peers cache too old (${(age/1000).toFixed(1)}s), discarding`)
+        }
+      }
+      
       // Restore per-page windows
       const pageWindowsStored = localStorage.getItem('ritual-scan-page-windows')
       if (pageWindowsStored) {
@@ -147,6 +163,16 @@ class RealtimeWebSocketManager {
         }
         localStorage.setItem('ritual-scan-cache', JSON.stringify(data))
         this.lastLocalStorageSave = Date.now()
+      }
+      
+      // Save validator peers (separate from blocks cache, never evicted)
+      if (this.validatorPeers.length > 0) {
+        const peersData = {
+          peers: this.validatorPeers,
+          timestamp: this.validatorPeersLastUpdate || Date.now()
+        }
+        localStorage.setItem('ritual-scan-validator-peers', JSON.stringify(peersData))
+        this.log(`💾 [${this.connectionId}] Saved ${this.validatorPeers.length} validator peers to localStorage`)
       }
       
       // Save per-page windows
@@ -615,6 +641,9 @@ class RealtimeWebSocketManager {
     
     this.validatorPeers = enrichedPeers
     this.logImportant(`🌍 [${this.connectionId}] Enriched ${enrichedPeers.filter(p => p.isReal).length}/${enrichedPeers.length} peers with GeoIP data`)
+    
+    // Save to localStorage immediately (validator peers are precious and change slowly)
+    this.saveCacheToStorage()
   }
 
   private startHighFrequencyPolling() {

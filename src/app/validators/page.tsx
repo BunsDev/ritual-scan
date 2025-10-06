@@ -473,7 +473,9 @@ export default function ValidatorsPage() {
                             const manager = getRealtimeManager()
                             const peers = manager?.getCachedValidatorPeers() || []
                             const peer = peers.find(p => p.coinbase_address?.toLowerCase() === validator.address.toLowerCase())
-                            return peer?.ip_address || <span className="text-lime-400/50">Waiting...</span>
+                            const ipWithPort = peer?.ip_address
+                            const ipOnly = ipWithPort?.split(':')[0]
+                            return ipOnly || <span className="text-lime-400/50">Waiting...</span>
                           })()}
                         </div>
                       </td>
