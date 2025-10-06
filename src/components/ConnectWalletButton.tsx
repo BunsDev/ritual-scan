@@ -1,7 +1,11 @@
 'use client'
 
 import { useAccount, useConnect, useDisconnect, useEnsName } from 'wagmi'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { createWalletClient, http, parseEther } from 'viem'
+import { privateKeyToAccount } from 'viem/accounts'
+import { rethClient } from '@/lib/reth-client'
+import { ritualChain } from '@/lib/wagmi-config'
 
 export function ConnectWalletButton() {
   const { address, isConnected } = useAccount()
@@ -9,10 +13,77 @@ export function ConnectWalletButton() {
   const { disconnect } = useDisconnect()
   const { data: ensName } = useEnsName({ address })
   const [showModal, setShowModal] = useState(false)
+  const [faucetSent, setFaucetSent] = useState(false)
+  const [addingNetwork, setAddingNetwork] = useState(false)
 
   const formatAddress = (addr: string) => {
     return `${addr.slice(0, 6)}...${addr.slice(-4)}`
   }
+
+  // Add Ritual Network to MetaMask
+  const addRitualNetwork = async () => {
+    setAddingNetwork(true)
+    try {
+      const config = rethClient.getConfiguration()
+      await window.ethereum?.request({
+        method: 'wallet_addEthereumChain',
+        params: [
+          {
+            chainId: '0x1B58', // 7000 in hex
+            chainName: 'Ritual Chain (Shrinenet)',
+            nativeCurrency: {
+              name: 'Ritual',
+              symbol: 'RITUAL',
+              decimals: 18,
+            },
+            rpcUrls: [config.primary || 'http://35.196.101.134:8545'],
+            blockExplorerUrls: ['https://ding.fish'],
+          },
+        ],
+      })
+      console.log('✅ Ritual Network added to MetaMask')
+    } catch (error) {
+      console.error('Failed to add network:', error)
+    } finally {
+      setAddingNetwork(false)
+    }
+  }
+
+  // Faucet: Send 100 RITUAL from anvil default account
+  const sendFaucetTokens = async (userAddress: string) => {
+    try {
+      console.log('🚰 Sending 100 RITUAL from faucet...')
+      
+      const config = rethClient.getConfiguration()
+      const rpcUrl = config.primary || 'http://35.196.101.134:8545'
+      
+      // Create wallet client with anvil default account
+      const account = privateKeyToAccount('0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80')
+      const client = createWalletClient({
+        account,
+        chain: ritualChain,
+        transport: http(rpcUrl)
+      })
+
+      // Send 100 RITUAL tokens
+      const hash = await client.sendTransaction({
+        to: userAddress as `0x${string}`,
+        value: parseEther('100'), // 100 RITUAL tokens
+      })
+
+      console.log(`✅ Faucet transaction sent: ${hash}`)
+      setFaucetSent(true)
+    } catch (error) {
+      console.error('❌ Faucet failed:', error)
+    }
+  }
+
+  // Auto-send faucet when wallet connects
+  useEffect(() => {
+    if (isConnected && address && !faucetSent) {
+      sendFaucetTokens(address)
+    }
+  }, [isConnected, address, faucetSent])
 
   if (isConnected && address) {
     return (
@@ -31,15 +102,34 @@ export function ConnectWalletButton() {
             <div className="font-mono text-sm text-white mb-4 break-all">
               {address}
             </div>
-            <button
-              onClick={() => {
-                disconnect()
-                setShowModal(false)
-              }}
-              className="w-full px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm"
-            >
-              Disconnect
-            </button>
+            
+            {faucetSent && (
+              <div className="mb-3 p-2 bg-green-900/20 border border-green-500/30 rounded text-xs text-green-300">
+                ✅ 100 RITUAL tokens sent!
+              </div>
+            )}
+            
+            <div className="space-y-2">
+              <button
+                onClick={addRitualNetwork}
+                disabled={addingNetwork}
+                className="w-full px-4 py-2 bg-lime-600 hover:bg-lime-700 text-white rounded-lg transition-colors text-sm font-medium disabled:opacity-50 flex items-center justify-center space-x-2"
+              >
+                <span>🦊</span>
+                <span>{addingNetwork ? 'Adding...' : 'Add Ritual Shrinenet'}</span>
+              </button>
+              
+              <button
+                onClick={() => {
+                  disconnect()
+                  setShowModal(false)
+                  setFaucetSent(false)
+                }}
+                className="w-full px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm"
+              >
+                Disconnect
+              </button>
+            </div>
           </div>
         )}
       </div>
@@ -96,8 +186,23 @@ export function ConnectWalletButton() {
               ))}
             </div>
 
-            <div className="mt-6 text-xs text-lime-400/60 text-center">
-              By connecting, you agree to our Terms of Service
+            {/* Add Network Button */}
+            <div className="mt-4 pt-4 border-t border-lime-500/20">
+              <button
+                onClick={addRitualNetwork}
+                disabled={addingNetwork}
+                className="w-full px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg transition-colors text-sm font-medium disabled:opacity-50 flex items-center justify-center space-x-2"
+              >
+                <span>🦊</span>
+                <span>{addingNetwork ? 'Adding Network...' : 'Add Ritual Shrinenet'}</span>
+              </button>
+              <p className="text-xs text-lime-400/60 text-center mt-2">
+                Adds Ritual Chain to your MetaMask
+              </p>
+            </div>
+
+            <div className="mt-4 text-xs text-lime-400/60 text-center">
+              Auto-faucet: 100 RITUAL tokens sent on first connection
             </div>
           </div>
         </div>
