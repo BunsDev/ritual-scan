@@ -90,24 +90,43 @@ export function ValidatorWorldMap({ validators }: ValidatorWorldMapProps) {
             viewBox={`0 0 ${mapWidth} ${mapHeight}`}
             className="absolute inset-0 w-full h-full"
           >
-            {/* Detailed world map background using external SVG */}
+            {/* Detailed world map background */}
             <image 
               href="https://upload.wikimedia.org/wikipedia/commons/8/83/Equirectangular_projection_SW.jpg"
               x="0" 
               y="0" 
               width={mapWidth} 
               height={mapHeight}
-              opacity="0.15"
+              opacity="0.35"
               preserveAspectRatio="xMidYMid slice"
+              style={{ filter: 'brightness(0.6) contrast(1.3)' }}
             />
             
+            {/* Overlay to enhance continents */}
+            <rect
+              x="0"
+              y="0"
+              width={mapWidth}
+              height={mapHeight}
+              fill="url(#mapOverlay)"
+              opacity="0.4"
+            />
+            <defs>
+              <radialGradient id="mapOverlay">
+                <stop offset="0%" stopColor="rgba(163, 230, 53, 0.05)" />
+                <stop offset="100%" stopColor="rgba(0, 0, 0, 0.3)" />
+              </radialGradient>
+            </defs>
+            
             {/* Grid lines for lat/lon reference */}
-            <g stroke="rgba(163, 230, 53, 0.08)" strokeWidth="0.5" opacity="0.4">
+            <g stroke="rgba(163, 230, 53, 0.15)" strokeWidth="0.8" opacity="0.6">
+              {/* Latitude lines */}
               {[100, 200, 300, 400].map(y => (
-                <line key={`lat-${y}`} x1="0" y1={y} x2={mapWidth} y2={y} strokeDasharray="2,2" />
+                <line key={`lat-${y}`} x1="0" y1={y} x2={mapWidth} y2={y} strokeDasharray="3,3" />
               ))}
+              {/* Longitude lines */}
               {[200, 400, 600, 800].map(x => (
-                <line key={`lon-${x}`} x1={x} y1="0" x2={x} y2={mapHeight} strokeDasharray="2,2" />
+                <line key={`lon-${x}`} x1={x} y1="0" x2={x} y2={mapHeight} strokeDasharray="3,3" />
               ))}
             </g>
 
