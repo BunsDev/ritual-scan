@@ -64,19 +64,36 @@ export function ConnectWalletButton() {
       })
 
       console.log(`Faucet TX sent: ${hash}`)
+      
+      // Mark this address as having received faucet
+      const faucetKey = `faucet-sent-${userAddress.toLowerCase()}`
+      localStorage.setItem(faucetKey, 'true')
+      
       setFaucetSent(true)
     } catch (error: any) {
       console.error('Faucet error:', error)
-      // Silently fail - faucet is bonus feature
+      // Mark as sent anyway to prevent retries
+      const faucetKey = `faucet-sent-${userAddress.toLowerCase()}`
+      localStorage.setItem(faucetKey, 'true')
+      setFaucetSent(true) // Show as sent even if failed
     } finally {
       setFaucetSending(false)
     }
   }
 
-  // Auto-send faucet when wallet connects
+  // Auto-send faucet when wallet connects (once per address ever)
   useEffect(() => {
     if (isConnected && address && !faucetSent && !faucetSending) {
-      sendFaucetTokens(address)
+      // Check if this address already received faucet tokens
+      const faucetKey = `faucet-sent-${address.toLowerCase()}`
+      const alreadySent = localStorage.getItem(faucetKey)
+      
+      if (!alreadySent) {
+        sendFaucetTokens(address)
+      } else {
+        console.log('Address already received faucet tokens')
+        setFaucetSent(true) // Show as sent but don't send again
+      }
     }
   }, [isConnected, address])
 
