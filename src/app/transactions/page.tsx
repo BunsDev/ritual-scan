@@ -50,15 +50,23 @@ export default function TransactionsPage() {
         console.log(`🚀 [Transactions] Extracting transactions from ${cachedBlocks.length} cached blocks`)
         const allTransactions: Transaction[] = []
         
-        for (const block of cachedBlocks.slice(0, 5)) {
+        for (const block of cachedBlocks.slice(0, 20)) {
           if (block.transactions && Array.isArray(block.transactions)) {
-            for (const tx of block.transactions.slice(0, 10)) {
-              if (typeof tx === 'object' && tx.hash) {
-                allTransactions.push(tx as Transaction)
+            // Check if we have full transaction objects or just hashes
+            const firstTx = block.transactions[0]
+            if (typeof firstTx === 'object' && firstTx.hash) {
+              // Full transaction objects available
+              for (const tx of block.transactions.slice(0, 10)) {
+                if (tx && tx.hash) {
+                  allTransactions.push(tx as Transaction)
+                }
               }
             }
+            // If we only have hashes (strings), skip this block and rely on API fetch
           }
         }
+        
+        console.log(`📦 [Transactions] Extracted ${allTransactions.length} transactions from cache`)
         
         if (allTransactions.length > 0) {
           setTransactions(allTransactions.slice(0, 50))
@@ -67,6 +75,7 @@ export default function TransactionsPage() {
         }
       }
       
+      console.log(`⚠️ [Transactions] No cached transactions available, will fetch from API`)
       return false // No cached data available
     } catch (error) {
       console.warn('⚠️ [Transactions] Failed to load cached data:', error)
@@ -146,14 +155,19 @@ export default function TransactionsPage() {
 
   const loadTransactions = async () => {
     try {
+      console.log('📥 [Transactions] loadTransactions() called')
       setInitialLoading(true)
       setError(null)
       
       // Get recent blocks with transactions
+      console.log('📥 [Transactions] Fetching 5 recent blocks...')
       const recentBlocks = await rethClient.getRecentBlocks(5)
+      console.log(`📥 [Transactions] Got ${recentBlocks.length} blocks`)
+      
       const allTransactions: Transaction[] = []
       
       for (const block of recentBlocks) {
+        console.log(`  Block ${parseInt(block.number, 16)}: ${block.transactions?.length || 0} transactions (type: ${typeof block.transactions?.[0]})`)
         if (block.transactions && Array.isArray(block.transactions)) {
           // Get full transaction details for each tx in the block
           for (const tx of block.transactions.slice(0, 10)) { // Limit to 10 txs per block
@@ -164,6 +178,7 @@ export default function TransactionsPage() {
         }
       }
       
+      console.log(`📥 [Transactions] Extracted ${allTransactions.length} total transactions`)
       setTransactions(allTransactions.slice(0, 50)) // Show latest 50 transactions
       
       if (recentBlocks.length > 0) {
@@ -171,6 +186,7 @@ export default function TransactionsPage() {
         setLatestBlock(latest)
       }
     } catch (err) {
+      console.error('❌ [Transactions] loadTransactions() error:', err)
       setError(err instanceof Error ? err.message : 'Failed to load transactions')
     } finally {
       setInitialLoading(false)
