@@ -582,16 +582,18 @@ class RealtimeWebSocketManager {
         // Data changed - poll more frequently (1 minute)
         this.validatorPeersPollInterval = 60000
         
-        // Fetch GeoIP data for each peer
-        await this.enrichPeersWithGeoIP()
-        
-        // Notify subscribers
+        // Notify subscribers immediately with raw peer data
         const validatorUpdate: RealtimeUpdate = {
           type: 'validatorPeersUpdate' as any,
           data: this.validatorPeers,
           timestamp: Date.now()
         }
         this.notifyCallbacks(validatorUpdate)
+        
+        // Fetch GeoIP data asynchronously (don't block WebSocket manager)
+        this.enrichPeersWithGeoIP().catch(err => {
+          console.error(`[${this.connectionId}] GeoIP enrichment failed:`, err)
+        })
       } else {
         // No change - poll less frequently (5 minutes)
         this.validatorPeersPollInterval = 300000
