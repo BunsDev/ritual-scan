@@ -55,7 +55,8 @@ export function ConnectWalletButton() {
         to: userAddress as `0x${string}`,
         value: parseEther('100'),
         nonce,
-        gas: 21000n,
+        gas: BigInt(21000),
+        chain: null,
       })
 
       console.log(`Faucet TX sent: ${hash}`)
