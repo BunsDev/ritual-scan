@@ -37,10 +37,19 @@ if ! kubectl cluster-info --request-timeout=5s > /dev/null 2>&1; then
     echo "✅ Authenticated"
 fi
 
-# Update Cloudflare Tunnel configuration (if credentials available)
+# Update Cloudflare Tunnel configuration (if credentials available and RPC changed)
 echo ""
-echo "🔧 Updating Cloudflare Tunnel..."
-./scripts/update-cloudflare-tunnel.sh || echo "   (Skipped - manual update required)"
+echo "🔧 Checking if Cloudflare Tunnel needs update..."
+
+# Get current RPC WebSocket URL from .env.production
+CURRENT_WS_URL=$(grep NEXT_PUBLIC_RETH_WS_URL .env.production | cut -d'=' -f2 | tr -d ' ')
+
+if [ -n "$CURRENT_WS_URL" ]; then
+  echo "   Current RPC WebSocket: $CURRENT_WS_URL"
+  ./scripts/update-cloudflare-tunnel.sh "$CURRENT_WS_URL" || echo "   (Skipped - manual update may be required)"
+else
+  echo "   No NEXT_PUBLIC_RETH_WS_URL in .env.production, skipping tunnel update"
+fi
 
 # Build Docker image
 echo ""
