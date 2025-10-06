@@ -50,7 +50,7 @@ const geographicRegions = [
 export function ValidatorNetworkMap({ validators }: ValidatorNetworkMapProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [nodes, setNodes] = useState<ValidatorNode[]>([])
-  const animationRef = useRef<number>()
+  const animationRef = useRef<number | undefined>(undefined)
 
   useEffect(() => {
     if (!validators || validators.length === 0) return
