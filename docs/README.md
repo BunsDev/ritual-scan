@@ -14,31 +14,32 @@
 
 ## Deployment
 
-- [Deploy to ding.fish](../DEPLOY_TO_DING_FISH.md) - Production deployment
+- [Deploy to ding.fish](deployment/DEPLOY_TO_DING_FISH.md) - Production deployment
+- [ding.fish HTTPS Setup](deployment/DING_FISH_HTTPS_SETUP.md) - Production HTTPS config
+- [Cloudflare Setup](deployment/CLOUDFLARE.md) - CDN and WebSocket proxy
 - [GCP Deployment Strategy](GCP_DEPLOYMENT_STRATEGY.md) - GCP/GKE setup
 - [GKE Quick Start](GKE_QUICK_START.md) - Fast GKE setup
 - [General Deployment Guide](DEPLOYMENT.md) - All deployment options
 
-## Infrastructure
+## Architecture
 
-- [Cloudflare Setup](../CLOUDFLARE.md) - CDN and WebSocket proxy
-- [HTTPS/WSS Proxy](../HTTPS_WSS_PROXY_IMPLEMENTATION.md) - Mixed content solution
-- [Cache Architecture](../FINAL_CACHE_ARCHITECTURE.md) - Caching system design
-- [WebSocket Architecture](../FINAL_WEBSOCKET_SOLUTION.md) - Real-time updates
-- [WebSocket E2E](../WEBSOCKET_ARCHITECTURE_E2E.md) - End-to-end flow
+- [Cache Architecture](architecture/CACHE_ARCHITECTURE.md) - Caching strategy overview
+- [Final Cache Architecture](architecture/FINAL_CACHE_ARCHITECTURE.md) - Production caching design
+- [WebSocket Solution](architecture/FINAL_WEBSOCKET_SOLUTION.md) - Real-time updates
+- [WebSocket E2E](architecture/WEBSOCKET_ARCHITECTURE_E2E.md) - End-to-end flow
+- [HTTPS/WSS Proxy](architecture/HTTPS_WSS_PROXY_IMPLEMENTATION.md) - Mixed content solution
 
-## Features
+## Admin & Features
 
-- [Admin API](../ENABLE_ADMIN_API.md) - Admin functionality
-- [Admin API Quick Start](../QUICK_START_ADMIN_API.md) - Quick setup
-- [Admin API QA](../ADMIN_API_QA.md) - Testing guide
-- [Validator Discovery](../VALIDATOR_IP_DISCOVERY.md) - Validator location logic
-- [Feature Roadmap](../FEATURE_ROADMAP.md) - Planned features
+- [Admin API](admin/ENABLE_ADMIN_API.md) - Admin functionality
+- [Admin API Quick Start](admin/QUICK_START_ADMIN_API.md) - Quick setup
+- [Admin API QA](admin/ADMIN_API_QA.md) - Testing guide
+- [Validator Discovery](VALIDATOR_IP_DISCOVERY.md) - Validator location logic
+- [Feature Roadmap](FEATURE_ROADMAP.md) - Planned features
 
 ## Performance
 
-- [Performance Fix Summary](../PERFORMANCE_FIX_SUMMARY.md) - Recent optimizations
-- [Cache Architecture Overview](../CACHE_ARCHITECTURE.md) - Caching strategy
+- [Performance Fix Summary](PERFORMANCE_FIX_SUMMARY.md) - Recent optimizations
 
 ## Development
 
