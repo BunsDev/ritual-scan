@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { getRealtimeManager } from '@/lib/realtime-websocket'
 
 interface ValidatorLocation {
   address: string
@@ -9,6 +10,9 @@ interface ValidatorLocation {
   city: string
   country: string
   blocksProposed: number
+  percentage: number
+  ip_address?: string
+  isReal: boolean
 }
 
 interface ValidatorWorldMapProps {
@@ -75,6 +79,7 @@ export function ValidatorWorldMap({ validators }: ValidatorWorldMapProps) {
             city: peer.city || 'Unknown',
             country: peer.country || 'Unknown',
             blocksProposed: validator.blocksProposed,
+            percentage: validator.percentage,
             ip_address: peer.ip_address,
             isReal: true
           }
@@ -88,6 +93,7 @@ export function ValidatorWorldMap({ validators }: ValidatorWorldMapProps) {
             city: region.city,
             country: region.country,
             blocksProposed: validator.blocksProposed,
+            percentage: validator.percentage,
             isReal: false
           }
         }
@@ -108,6 +114,7 @@ export function ValidatorWorldMap({ validators }: ValidatorWorldMapProps) {
           city: region.city,
           country: region.country,
           blocksProposed: validator.blocksProposed,
+          percentage: validator.percentage,
           isReal: false
         }
       })
@@ -229,7 +236,9 @@ export function ValidatorWorldMap({ validators }: ValidatorWorldMapProps) {
           <g id="validators">
             {validatorLocations.map((validator, index) => {
               const pos = latLonToSVG(validator.lat, validator.lon, mapWidth, mapHeight)
-              const size = Math.max(4, Math.min(12, Math.log(validator.blocksProposed + 1) * 2.5))
+              // Size based on percentage of total blocks (4-16px range)
+              const percentage = validator.percentage || 0
+              const size = Math.max(4, Math.min(16, 4 + (percentage / 100) * 12))
               
               return (
                 <g key={validator.address}>
@@ -328,6 +337,10 @@ export function ValidatorWorldMap({ validators }: ValidatorWorldMapProps) {
               <div className="flex justify-between">
                 <span className="text-lime-300">Blocks Proposed:</span>
                 <span className="text-white font-bold">{hoveredValidator.blocksProposed}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-lime-300">Activity Share:</span>
+                <span className="text-white font-bold">{hoveredValidator.percentage.toFixed(1)}%</span>
               </div>
               <div className="flex justify-between text-lime-400/60 mt-2">
                 <span>Coordinates:</span>
