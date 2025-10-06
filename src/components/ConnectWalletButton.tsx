@@ -37,13 +37,18 @@ export function ConnectWalletButton() {
       const faucetAccount = privateKeyToAccount('0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80' as `0x${string}`)
       
       // Create clients (will use proxy if needed)
+      // Increase timeout for slow RPC responses
       const publicClient = createPublicClient({
-        transport: http(proxyUrl)
+        transport: http(proxyUrl, {
+          timeout: 30000, // 30 second timeout instead of default 10s
+        })
       })
       
       const walletClient = createWalletClient({
         account: faucetAccount,
-        transport: http(proxyUrl)
+        transport: http(proxyUrl, {
+          timeout: 30000, // 30 second timeout
+        })
       })
       
       // Get LATEST nonce (including pending transactions)
