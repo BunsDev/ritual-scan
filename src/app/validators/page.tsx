@@ -432,6 +432,9 @@ export default function ValidatorsPage() {
                       Validator Address
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-medium text-lime-300 uppercase tracking-wider">
+                      IP Address
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-medium text-lime-300 uppercase tracking-wider">
                       Blocks Proposed
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-medium text-lime-300 uppercase tracking-wider">
@@ -466,6 +469,16 @@ export default function ValidatorsPage() {
                         >
                           {validator.address.slice(0, 10)}...{validator.address.slice(-8)}
                         </Link>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-lime-400 font-mono">
+                          {(() => {
+                            const manager = getRealtimeManager()
+                            const peers = manager?.getCachedValidatorPeers() || []
+                            const peer = peers.find(p => p.coinbase_address?.toLowerCase() === validator.address.toLowerCase())
+                            return peer?.ip_address || <span className="text-lime-400/50">Waiting...</span>
+                          })()}
+                        </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-white font-medium">

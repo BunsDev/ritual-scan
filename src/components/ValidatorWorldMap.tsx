@@ -333,11 +333,17 @@ export function ValidatorWorldMap({ validators }: ValidatorWorldMapProps) {
         {/* Hover tooltip */}
         {hoveredValidator && (
           <div className="absolute top-4 left-4 bg-black/90 border border-lime-500/50 rounded-lg p-4 z-10 min-w-[250px]">
-            <div className="text-xs text-lime-400 mb-1">Validator</div>
+            <div className="text-xs text-lime-400 mb-1">
+              Validator {hoveredValidator.isReal && <span className="text-green-400">• Real Data</span>}
+            </div>
             <div className="font-mono text-sm text-white mb-2">
               {hoveredValidator.address.slice(0, 10)}...{hoveredValidator.address.slice(-8)}
             </div>
             <div className="space-y-1 text-xs">
+              <div className="flex justify-between">
+                <span className="text-lime-300">IP Address:</span>
+                <span className="text-white font-mono">{hoveredValidator.ip_address || 'Waiting...'}</span>
+              </div>
               <div className="flex justify-between">
                 <span className="text-lime-300">Location:</span>
                 <span className="text-white">{hoveredValidator.city}, {hoveredValidator.country}</span>

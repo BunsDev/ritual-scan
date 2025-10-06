@@ -526,20 +526,16 @@ class RealtimeWebSocketManager {
     }
   }
 
-  // Fetch validator peer list from Summit node
+  // Fetch validator peer list from Summit node (via API route to avoid CORS)
   private async fetchValidatorPeers() {
     try {
-      const config = rethClient.getConfiguration()
-      const rpcUrl = config.primary || 'http://35.196.202.163:8545'
+      // Use our API route which fetches server-side
+      const peerListUrl = '/api/validator-peers'
       
-      // Extract IP from RPC URL (Summit node IP)
-      const summitIp = rpcUrl.match(/https?:\/\/([^:]+)/)?.[1] || '35.196.202.163'
-      const peerListUrl = `http://${summitIp}:3030/get_peer_list`
-      
-      this.log(`🔍 [${this.connectionId}] Fetching validator peers from ${peerListUrl}`)
+      this.log(`🔍 [${this.connectionId}] Fetching validator peers via API route`)
       
       const response = await fetch(peerListUrl, {
-        signal: AbortSignal.timeout(5000)
+        signal: AbortSignal.timeout(10000)
       })
       
       if (!response.ok) {
