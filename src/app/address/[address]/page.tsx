@@ -48,7 +48,7 @@ export default function AddressPage() {
       // Set up real-time updates using WebSocket manager
       const manager = getRealtimeManager()
       if (manager) {
-        const unsubscribe = manager.subscribe((update) => {
+        const unsubscribe = manager.subscribe(`address-${address}`, (update: any) => {
           if (update.type === 'block') {
             console.log('New block, checking for address updates:', update.data.number)
             checkBlockForAddress(update.data)
