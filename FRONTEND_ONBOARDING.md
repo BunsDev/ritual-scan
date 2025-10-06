@@ -238,13 +238,11 @@ const pageBlocks = manager.getPageBlockWindow('analytics') // Page-specific
 
 ---
 
-### 2. **The RPC Client** (`reth-client.ts`)
+### RPC Client (`reth-client.ts`)
 
-**Pattern**: Singleton instance exported as `rethClient`
+Singleton instance exported as `rethClient`. Key feature is automatic HTTPS→HTTP proxy for mixed content.
 
-**Key Feature**: Automatic HTTPS→HTTP proxy for mixed content
-
-**How It Works**:
+Usage:
 ```typescript
 // On HTTPS (ding.fish), automatically uses /api/rpc-proxy
 // On HTTP (localhost), direct RPC calls
@@ -254,31 +252,27 @@ const block = await rethClient.getBlock(12345, true) // with transactions
 const tx = await rethClient.getTransaction(hash)
 ```
 
-**User-Configurable**: Settings page lets users change RPC endpoint at runtime
+User-configurable: Settings page lets users change RPC endpoint at runtime.
 
----
+### Ritual Chain Transaction Types
 
-### 3. **Ritual Chain Transaction Types**
-
-Standard Ethereum + Custom types:
+Standard Ethereum plus custom types:
 
 | Type | Hex | Description | System Account |
 |------|-----|-------------|----------------|
 | Legacy | 0x0 | Standard Ethereum | N/A |
 | EIP-1559 | 0x2 | Modern gas model | N/A |
-| **Scheduled** | **0x10** | Cron-like execution | 0x...fa7e |
-| **Async Commitment** | **0x11** | TEE execution start | 0x...fa8e |
-| **Async Settlement** | **0x12** | Final settlement | 0x...fa9e |
+| Scheduled | 0x10 | Cron-like execution | 0x...fa7e |
+| Async Commitment | 0x11 | TEE execution start | 0x...fa8e |
+| Async Settlement | 0x12 | Final settlement | 0x...fa9e |
 
-**Why It Matters**: You need to handle these custom types in UI (badges, flows, special pages)
+These show up throughout the UI - badges, transaction flows, special pages for each type.
 
----
+### /api/rpc-proxy Route
 
-### 4. **The /api/rpc-proxy Route**
+Problem: HTTPS site can't fetch HTTP RPC (mixed content blocked by browsers).
 
-**Problem**: HTTPS site can't fetch HTTP RPC (mixed content blocked)
-
-**Solution**: Next.js API route proxies requests server-side
+Solution: Next.js API route proxies requests server-side.
 
 ```typescript
 // Browser on ding.fish (HTTPS)
@@ -291,27 +285,25 @@ fetch('/api/rpc-proxy', {
 // Returns response to browser
 ```
 
-**Smart Feature**: Reads `x-rpc-url` header for dynamic RPC switching
+Also reads `x-rpc-url` header for dynamic RPC switching.
 
----
+## Data Flow Examples
 
-## 📊 Data Flow Examples
-
-### **Example 1: Charts Page Load (Optimized)**
+### Charts Page Load (Optimized)
 
 ```
 User clicks "Charts" →
   ↓
 Page checks global cache (getRealtimeManager().getCachedBlocks())
   ↓
-Cache has 500 blocks → INSTANT LOAD (< 100ms) ✅
+Cache has 500 blocks → instant load (< 100ms)
   ↓
 Subscribes to WebSocket for updates
   ↓
 New blocks arrive → Charts update in real-time
 ```
 
-### **Example 2: Address Page**
+### Address Page
 
 ```
 User enters address →
@@ -329,7 +321,7 @@ Check each new block for address transactions
 Update in real-time
 ```
 
-### **Example 3: Wallet Connection + Faucet**
+### Wallet Connection + Faucet
 
 ```
 User clicks "Connect Wallet" →
@@ -349,58 +341,57 @@ Transaction completes in < 1 second
 Mark address in localStorage (prevent retry)
 ```
 
----
+## Key Files to Understand
 
-## 🔑 Key Files to Understand
+### `src/lib/realtime-websocket.ts` (600+ lines)
 
-### **1. `src/lib/realtime-websocket.ts`** (600+ lines)
-- **What**: WebSocket manager singleton
-- **Why Important**: Powers all real-time updates + caching
-- **Key Methods**:
-  - `getRealtimeManager()` - Get singleton instance
-  - `subscribe(id, callback)` - Listen for updates
-  - `getCachedBlocks()` - Get global cache
-  - `getPageBlockWindow(pageId)` - Get per-page cache
+WebSocket manager singleton. Powers all real-time updates and caching.
 
-### **2. `src/lib/reth-client.ts`** (500+ lines)
-- **What**: RPC client wrapper
-- **Why Important**: All blockchain data goes through this
-- **Key Methods**:
-  - `rpcCall(method, params)` - Generic RPC call
-  - `getBlock(number, includeTxs)` - Fetch block
-  - `getTransaction(hash)` - Fetch transaction
-  - `testConnection(url)` - Test RPC endpoint
+Key methods:
+- `getRealtimeManager()` - Get singleton instance
+- `subscribe(id, callback)` - Listen for updates
+- `getCachedBlocks()` - Get global cache
+- `getPageBlockWindow(pageId)` - Get per-page cache
 
-### **3. `src/app/analytics/page.tsx`** (1200+ lines)
-- **What**: Charts dashboard (RECENTLY OPTIMIZED)
-- **Why Important**: Example of cache-first pattern
-- **Key Concept**: 
+### `src/lib/reth-client.ts` (500+ lines)
+
+RPC client wrapper. All blockchain data goes through this.
+
+Key methods:
+- `rpcCall(method, params)` - Generic RPC call
+- `getBlock(number, includeTxs)` - Fetch block
+- `getTransaction(hash)` - Fetch transaction
+- `testConnection(url)` - Test RPC endpoint
+
+### `src/app/analytics/page.tsx` (1200+ lines)
+
+Charts dashboard (recently optimized). Good example of cache-first pattern: 
   ```typescript
   // Priority 1: Global cache
   const globalBlocks = manager.getCachedBlocks()
   if (globalBlocks.length > 0) {
-    // INSTANT LOAD
+    // instant load
   }
   ```
 
-### **4. `src/components/ConnectWalletButton.tsx`** (300 lines)
-- **What**: Wallet integration + faucet
-- **Why Important**: Shows Wagmi/Viem usage
-- **Key Features**:
-  - Auto-faucet on connect
-  - Network addition to MetaMask
-  - One-time-per-address logic
+### `src/components/ConnectWalletButton.tsx` (300 lines)
 
-### **5. `src/app/api/rpc-proxy/route.ts`** (66 lines)
-- **What**: HTTPS→HTTP proxy
-- **Why Important**: Solves mixed content issue
-- **How It Works**: Reads request → forwards to RPC → returns response
+Wallet integration plus faucet. Shows Wagmi/Viem usage.
 
----
+Key features:
+- Auto-faucet on connect
+- Network addition to MetaMask
+- One-time-per-address logic
 
-## 🚀 Development Workflow
+### `src/app/api/rpc-proxy/route.ts` (66 lines)
 
-### **Local Development**
+HTTPS→HTTP proxy. Solves mixed content issue.
+
+Flow: Reads request → forwards to RPC → returns response.
+
+## Development Workflow
+
+### Local Development
 
 ```bash
 # 1. Install dependencies
@@ -417,13 +408,13 @@ npm run dev
 open http://localhost:5555
 ```
 
-### **Key Dev URLs**
+Key dev URLs:
 - Homepage: http://localhost:5555
-- Charts: http://localhost:5555/analytics (check cache performance)
+- Charts: http://localhost:5555/analytics
 - Stats: http://localhost:5555/ritual-analytics
-- Settings: http://localhost:5555/settings (change RPC endpoint)
+- Settings: http://localhost:5555/settings
 
-### **Testing Changes**
+Testing changes:
 
 ```bash
 # TypeScript check
@@ -436,11 +427,9 @@ npm run lint
 npm run build
 ```
 
----
+## Common Dev Tasks
 
-## 🔧 Common Dev Tasks
-
-### **Task 1: Add a New Page**
+### Adding a New Page
 
 ```typescript
 // src/app/my-page/page.tsx
@@ -480,7 +469,7 @@ export default function MyPage() {
 }
 ```
 
-### **Task 2: Make RPC Calls**
+### Making RPC Calls
 
 ```typescript
 import { rethClient } from '@/lib/reth-client'
@@ -498,7 +487,7 @@ const tx = await rethClient.getTransaction(hash)
 const result = await rethClient.rpcCall('eth_getBalance', [address, 'latest'])
 ```
 
-### **Task 3: Add to Navigation**
+### Adding to Navigation
 
 ```typescript
 // src/components/Navigation.tsx
@@ -508,53 +497,47 @@ const NAV_ITEMS = [
 ]
 ```
 
----
+## Common Issues
 
-## 🐛 Common Issues & Solutions
+### "Failed to fetch RPC"
+Cause: RPC endpoint not reachable
+Fix: Check Settings page, test RPC connection
 
-### **Issue 1: "Failed to fetch RPC"**
-**Cause**: RPC endpoint not reachable
-**Solution**: Check Settings page, test RPC connection
+### "WebSocket connection failed"
+Cause: WebSocket endpoint not reachable or wrong protocol (ws/wss)
+Fix: Check browser console, falls back to polling automatically
 
-### **Issue 2: "WebSocket connection failed"**
-**Cause**: WebSocket endpoint not reachable or wrong protocol (ws/wss)
-**Solution**: Check browser console, falls back to polling automatically
+### "Cache is empty on page load"
+Cause: First visit before cache builds
+Fix: Wait 10-20 seconds, cache accumulates in background
 
-### **Issue 3: "Cache is empty on page load"**
-**Cause**: First visit before cache builds
-**Solution**: Wait 10-20 seconds, cache accumulates in background
+### "WalletConnect 403 errors"
+Cause: Domain not whitelisted in WalletConnect project
+Fix: Add domain to https://cloud.walletconnect.com project settings
 
-### **Issue 4: "WalletConnect 403 errors"**
-**Cause**: Domain not whitelisted in WalletConnect project
-**Solution**: Add domain to https://cloud.walletconnect.com project settings
+### "Page loads slowly"
+Cause: Not using cache (making direct RPC calls)
+Fix: Use `getCachedBlocks()` first, fall back to RPC if empty
 
-### **Issue 5: "Page loads slowly"**
-**Cause**: Not using cache (making direct RPC calls)
-**Solution**: Use `getCachedBlocks()` first, fall back to RPC if empty
+## Performance Best Practices
 
----
-
-## 📈 Performance Best Practices
-
-### **DO ✅**
+Do:
 - Use global cache first (`getCachedBlocks()`)
 - Use per-page windows for extended datasets
 - Subscribe to WebSocket for updates
 - Batch RPC calls when possible
 - Use React.memo for expensive components
 
-### **DON'T ❌**
-- Fetch 50-100 blocks on every page load (use cache!)
+Don't:
+- Fetch 50-100 blocks on every page load (use cache)
 - Make sequential RPC calls in loops (use `Promise.all`)
-- Ignore cache and always fetch fresh (defeats the purpose)
-- Subscribe without cleanup (causes memory leaks)
+- Ignore cache and always fetch fresh
+- Subscribe without cleanup (memory leaks)
 - Fetch full blocks when you only need headers
 
----
+## Deployment
 
-## 🚢 Deployment
-
-### **Production Deployment**
+### Production Deployment
 
 ```bash
 # Deploy to ding.fish (GKE)
@@ -568,85 +551,77 @@ const NAV_ITEMS = [
 # 5. Verifies deployment
 ```
 
-### **Environment Variables**
+### Environment Variables
 
-**Build-time** (baked into bundle):
+Build-time (baked into bundle):
 - `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID`
 - `NEXT_PUBLIC_RETH_RPC_URL`
 - `NEXT_PUBLIC_RETH_WS_URL`
 
-**Runtime** (can change without rebuild):
+Runtime (can change without rebuild):
 - None currently (all NEXT_PUBLIC_ are build-time)
 
-**Important**: `NEXT_PUBLIC_*` vars must be in `.env.production` for Docker builds!
+Important: `NEXT_PUBLIC_*` vars must be in `.env.production` for Docker builds.
 
----
+## Learning Path for New Engineers
 
-## 🎓 Learning Path for New Engineers
-
-### **Week 1: Understand the Stack**
+### Week 1: Understand the Stack
 1. Read this document thoroughly
 2. Run local dev, browse the site
 3. Read `realtime-websocket.ts` - understand caching
 4. Read `reth-client.ts` - understand RPC calls
 5. Read `analytics/page.tsx` - see cache-first pattern
 
-### **Week 2: Make Small Changes**
+### Week 2: Make Small Changes
 1. Add a new stat card to homepage
 2. Add a new chart to analytics
 3. Modify validator map styling
 4. Add a new filter to transactions page
 
-### **Week 3: Feature Work**
+### Week 3: Feature Work
 1. Pick a feature from backlog
 2. Implement using cache-first pattern
 3. Test locally
 4. Deploy to staging (if available)
-5. Code review + merge
+5. Code review and merge
 
----
+## Getting Help
 
-## 🆘 Getting Help
-
-### **Code Questions**
+### Code Questions
 - Check comments in key files (heavily documented)
 - Search for similar patterns in codebase
 - Check browser console (we log a lot)
 
-### **Blockchain/Ritual Questions**
+### Blockchain/Ritual Questions
 - Understand Ethereum basics first
-- Ritual Chain is Ethereum-compatible + custom tx types
+- Ritual Chain is Ethereum-compatible plus custom tx types
 - System accounts: fa7e (scheduled), fa8e (commitment), fa9e (settlement)
 
-### **Performance Questions**
+### Performance Questions
 - Use browser DevTools Performance tab
 - Check Network tab for RPC calls
 - Look for `getCachedBlocks()` usage
 
----
+## Metrics to Monitor
 
-## 📊 Metrics to Monitor
+### Performance
+- Page load time: Target < 500ms
+- Charts page: Target < 100ms (from cache)
+- Time to first block: Target < 2 seconds
 
-### **Performance**
-- Page load time: **Target < 500ms**
-- Charts page: **Target < 100ms** (from cache)
-- Time to first block: **Target < 2 seconds**
+### Cache
+- Global cache size: 500 blocks max
+- Per-page window: 1000 blocks max
+- localStorage size: Monitor, can hit quota
 
-### **Cache**
-- Global cache size: **500 blocks max**
-- Per-page window: **1000 blocks max**
-- localStorage size: **Monitor, can hit quota**
+### WebSocket
+- Connection uptime: Monitor reconnections
+- Message rate: ~0.5-2 blocks/sec
+- Subscription count: Should match open pages
 
-### **WebSocket**
-- Connection uptime: **Monitor reconnections**
-- Message rate: **~0.5-2 blocks/sec**
-- Subscription count: **Should match open pages**
+## Current State (v1.0.0)
 
----
-
-## 🎯 Current State (v1.0.0)
-
-**What Works** ✅
+What works:
 - Real-time WebSocket updates
 - Smart 500-block global cache
 - Instant page loads (< 100ms)
@@ -655,37 +630,33 @@ const NAV_ITEMS = [
 - HTTPS/WSS support via Cloudflare
 - Custom transaction type handling
 - Validator world map
-- Charts + Stats dashboards
+- Charts and Stats dashboards
 
-**Known Issues** ⚠️
+Known issues:
 - Validator map uses placeholder data (no real geolocation)
 - Faucet may timeout occasionally (30s timeout)
 - Cache takes 10-20s to build on first load
 
-**Future Improvements** 🔮
+Future improvements:
 - Real validator geolocation (need admin_peers RPC + GeoIP)
 - Contract verification UI
 - Token tracking
 - Advanced search
 - Historical data pagination
 
----
+## Summary
 
-## 🎉 You're Ready!
+You should now understand:
+- Architecture (cache-first, real-time)
+- Tech stack (Next.js, WebSocket, Viem/Wagmi)
+- Core concepts (caching, RPC proxy, custom tx types)
+- File structure
+- Development workflow
+- Design decisions and trade-offs
 
-You now understand:
-- ✅ Architecture (cache-first, real-time)
-- ✅ Tech stack (Next.js, WebSocket, Viem/Wagmi)
-- ✅ Core concepts (caching, RPC proxy, custom tx types)
-- ✅ File structure
-- ✅ Development workflow
-
-**Next steps**: Clone the repo, run it locally, start browsing the code!
-
-Welcome to Ritual Scan! 🚀
+Next: Clone the repo, run it locally, start browsing the code.
 
 ---
 
-*Last updated: 2025-10-06*
-*Version: v1.0.0*
-*Maintainer: Ritual Network Team*
+Last updated: 2025-10-06
+Version: v1.0.0
