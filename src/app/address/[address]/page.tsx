@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { rethClient } from '@/lib/reth-client'
+import { getRealtimeManager } from '@/lib/realtime-websocket'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { Navigation } from '@/components/Navigation'
@@ -44,21 +45,18 @@ export default function AddressPage() {
       loadAddressInfo()
       loadTransactions()
 
-      // Set up real-time updates
-      const ws = rethClient.createWebSocketConnection(
-        (newBlock) => {
-          console.log('New block, checking for address updates:', newBlock.number)
-          // Check if any transactions in the new block involve this address
-          checkBlockForAddress(newBlock)
-        },
-        (error) => {
-          console.error('WebSocket error on address page:', error)
-        }
-      )
+      // Set up real-time updates using WebSocket manager
+      const manager = getRealtimeManager()
+      if (manager) {
+        const unsubscribe = manager.subscribe((update) => {
+          if (update.type === 'block') {
+            console.log('New block, checking for address updates:', update.data.number)
+            checkBlockForAddress(update.data)
+          }
+        })
 
-      return () => {
-        if (ws) {
-          ws.close()
+        return () => {
+          unsubscribe()
         }
       }
     }
@@ -238,7 +236,6 @@ export default function AddressPage() {
                 <Link href="/scheduled" className="text-lime-300 hover:text-white px-3 py-2 text-sm font-medium transition-colors">Scheduled</Link>
                 <Link href="/async" className="text-lime-300 hover:text-white px-3 py-2 text-sm font-medium transition-colors">Async</Link>
                 <Link href="/analytics" className="text-lime-300 hover:text-white px-3 py-2 text-sm font-medium transition-colors">Analytics</Link>
-                <Link href="/gas-tracker" className="text-lime-300 hover:text-white px-3 py-2 text-sm font-medium transition-colors">Gas Tracker</Link>
                 <Link href="/settings" className="text-lime-300 hover:text-white px-3 py-2 text-sm font-medium transition-colors">Settings</Link>
               </nav>
             </div>
@@ -276,7 +273,6 @@ export default function AddressPage() {
                 <Link href="/scheduled" className="text-lime-300 hover:text-white px-3 py-2 text-sm font-medium transition-colors">Scheduled</Link>
                 <Link href="/async" className="text-lime-300 hover:text-white px-3 py-2 text-sm font-medium transition-colors">Async</Link>
                 <Link href="/analytics" className="text-lime-300 hover:text-white px-3 py-2 text-sm font-medium transition-colors">Analytics</Link>
-                <Link href="/gas-tracker" className="text-lime-300 hover:text-white px-3 py-2 text-sm font-medium transition-colors">Gas Tracker</Link>
                 <Link href="/settings" className="text-lime-300 hover:text-white px-3 py-2 text-sm font-medium transition-colors">Settings</Link>
               </nav>
             </div>

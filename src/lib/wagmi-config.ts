@@ -30,15 +30,16 @@ export const config = createConfig({
   chains: [ritualChain, mainnet],
   connectors: [
     injected(),
-    walletConnect({
-      projectId: 'YOUR_WALLETCONNECT_PROJECT_ID', // Get from https://cloud.walletconnect.com
-      metadata: {
-        name: 'Ritual Scan',
-        description: 'Blockchain Explorer for Ritual Chain',
-        url: 'https://ding.fish',
-        icons: ['https://ding.fish/favicon.ico']
-      }
-    }),
+    // WalletConnect disabled - requires project ID from cloud.walletconnect.com
+    // walletConnect({
+    //   projectId: 'YOUR_WALLETCONNECT_PROJECT_ID',
+    //   metadata: {
+    //     name: 'Ritual Scan',
+    //     description: 'Blockchain Explorer for Ritual Chain',
+    //     url: 'https://ding.fish',
+    //     icons: ['https://ding.fish/favicon.ico']
+    //   }
+    // }),
     coinbaseWallet({
       appName: 'Ritual Scan',
       darkMode: true
