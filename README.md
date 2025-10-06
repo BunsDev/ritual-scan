@@ -44,23 +44,47 @@ Visit `http://localhost:3000` to see the explorer.
 
 ## Screenshots
 
-### Async Settlement Transaction (Type 0x12)
+### Homepage Dashboard
 
-![Async Settlement Transaction (Type 0x12)](./docs/screenshots/tx-async-settlement.png)
+![Homepage Dashboard](./docs/screenshots/homepage.png)
 
-Final settlement transaction with fee distribution in Ritual Chain async execution
+Real-time network overview with latest blocks, transactions, and live stats
 
-### EIP-1559 Transaction (Type 0x2)
+### Charts Dashboard
 
-![EIP-1559 Transaction (Type 0x2)](./docs/screenshots/tx-eip1559.png)
+![Charts Dashboard](./docs/screenshots/analytics.png)
 
-Modern EIP-1559 transaction with priority fee and base fee mechanism
+Visual analytics with gas usage, transaction counts, and performance metrics
 
-### Scheduled Transaction (Type 0x10)
+### Ritual Chain Stats
 
-![Scheduled Transaction (Type 0x10)](./docs/screenshots/tx-scheduled.png)
+![Ritual Chain Stats](./docs/screenshots/ritual-analytics.png)
 
-Ritual Chain scheduled transaction with Call ID tracking and cron-like execution
+Async adoption metrics, protocol fees, and transaction type distribution
+
+### Block Explorer
+
+![Block Explorer](./docs/screenshots/blocks.png)
+
+Real-time block list with live updates via WebSocket
+
+### Validator Network Map
+
+![Validator Network Map](./docs/screenshots/validators.png)
+
+Geographic visualization of validator network with activity metrics
+
+### Live Mempool Monitor
+
+![Live Mempool Monitor](./docs/screenshots/mempool.png)
+
+Real-time pending transactions and scheduled jobs
+
+### RPC Configuration
+
+![RPC Configuration](./docs/screenshots/settings.png)
+
+User-configurable RPC endpoints with connection testing
 
 ## Production Deployment
 
