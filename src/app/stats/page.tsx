@@ -57,6 +57,10 @@ export default function RitualAnalyticsPage() {
     let blockCount = 0
     const precompileUsage: { [address: string]: number } = {}
     const recentActivity: any[] = []
+    
+    // Track commitments and settlements for settlement time calculation
+    const commitmentBlocks = new Map<string, number>() // originTx -> block number
+    const settlementTimes: number[] = []
 
     // Process each block's transactions
     for (const block of blocks) {
@@ -75,14 +79,35 @@ export default function RitualAnalyticsPage() {
               case 0: legacyTxs++; break
               case 2: eip1559Txs++; break
               case 0x10: scheduledTransactions++; break
-              case 0x11: asyncCommitments++; asyncTransactions++; break
-              case 0x12: asyncSettlements++; asyncTransactions++; break
+              case 0x11: 
+                asyncCommitments++
+                asyncTransactions++
+                // Track commitment block for settlement time calculation
+                if (tx.originTx) {
+                  commitmentBlocks.set(tx.originTx, block.number)
+                }
+                break
+              case 0x12: 
+                asyncSettlements++
+                asyncTransactions++
+                // Calculate settlement time if we have the commitment
+                if (tx.originTx && commitmentBlocks.has(tx.originTx)) {
+                  const commitBlock = commitmentBlocks.get(tx.originTx)!
+                  const settlementTime = block.number - commitBlock
+                  settlementTimes.push(settlementTime)
+                }
+                break
               default: legacyTxs++; break
             }
           }
         }
       }
     }
+    
+    // Calculate average settlement time from actual data
+    const avgSettlementTime = settlementTimes.length > 0
+      ? settlementTimes.reduce((sum, time) => sum + time, 0) / settlementTimes.length
+      : 2.5 // Fallback to estimate if no data
 
     const analyticsData: RitualAnalytics = {
       totalTransactions,
@@ -91,7 +116,7 @@ export default function RitualAnalyticsPage() {
       systemTransactions,
       asyncAdoptionRate: totalTransactions > 0 ? (asyncTransactions / totalTransactions) * 100 : 0,
       activeScheduledJobs: scheduledTransactions,
-      avgSettlementTime: 2.5,
+      avgSettlementTime: parseFloat(avgSettlementTime.toFixed(1)),
       totalProtocolFees: 0,
       executorEarnings: 0,
       validatorEarnings: 0,
@@ -232,6 +257,10 @@ export default function RitualAnalyticsPage() {
       let blockCount = 0
       const precompileUsage: { [address: string]: number } = {}
       const recentActivity: any[] = []
+      
+      // Track commitments and settlements for settlement time calculation
+      const commitmentBlocks = new Map<string, number>() // originTx -> block number
+      const settlementTimes: number[] = []
 
       // Process each block's transactions
       for (const block of recentBlocks) {
@@ -251,8 +280,24 @@ export default function RitualAnalyticsPage() {
                 case 0: legacyTxs++; break
                 case 2: eip1559Txs++; break
                 case 0x10: scheduledTransactions++; break
-                case 0x11: asyncCommitments++; asyncTransactions++; break
-                case 0x12: asyncSettlements++; asyncTransactions++; break
+                case 0x11: 
+                  asyncCommitments++
+                  asyncTransactions++
+                  // Track commitment block for settlement time calculation
+                  if (tx.originTx) {
+                    commitmentBlocks.set(tx.originTx, parseInt(block.number, 16))
+                  }
+                  break
+                case 0x12: 
+                  asyncSettlements++
+                  asyncTransactions++
+                  // Calculate settlement time if we have the commitment
+                  if (tx.originTx && commitmentBlocks.has(tx.originTx)) {
+                    const commitBlock = commitmentBlocks.get(tx.originTx)!
+                    const settlementTime = parseInt(block.number, 16) - commitBlock
+                    settlementTimes.push(settlementTime)
+                  }
+                  break
                 default: legacyTxs++; break
               }
             } else {
@@ -299,6 +344,11 @@ export default function RitualAnalyticsPage() {
       const avgGasPrice = 20 // gwei estimate
       const totalProtocolFees = (totalGasUsed * avgGasPrice) / 1e18 // Convert to RITUAL tokens
       
+      // Calculate average settlement time from actual data
+      const avgSettlementTime = settlementTimes.length > 0
+        ? settlementTimes.reduce((sum, time) => sum + time, 0) / settlementTimes.length
+        : 2.5 // Fallback to estimate if no data
+      
       // Store blocks for real-time updates
       blocksDataRef.current = recentBlocks
       if (recentBlocks.length > 0) {
@@ -312,7 +362,7 @@ export default function RitualAnalyticsPage() {
         systemTransactions: Math.floor(totalTransactions * 0.1), // Estimate system txs
         asyncAdoptionRate,
         activeScheduledJobs,
-        avgSettlementTime: 2.1, // Estimate - would need historical data
+        avgSettlementTime: parseFloat(avgSettlementTime.toFixed(1)),
         totalProtocolFees,
         executorEarnings: totalProtocolFees * 0.6, // 60% to executors
         validatorEarnings: totalProtocolFees * 0.4, // 40% to validators
