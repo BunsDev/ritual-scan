@@ -214,25 +214,25 @@ export function ValidatorWorldMap({ validators }: ValidatorWorldMapProps) {
             viewBox={`0 0 ${mapWidth} ${mapHeight * 0.85}`}
             className="absolute inset-0 w-full h-full"
           >
-            {/* CSS Animation for red flash */}
+            {/* CSS Animation for cyan flash */}
             <style>{`
-              @keyframes flashRed {
-                0% { fill: #ef4444; }
-                20% { fill: #ef4444; }
-                40% { fill: #fbbf24; }
-                60% { fill: #ef4444; }
-                80% { fill: #fbbf24; }
+              @keyframes flashCyan {
+                0% { fill: #06b6d4; }
+                20% { fill: #22d3ee; }
+                40% { fill: #60a5fa; }
+                60% { fill: #22d3ee; }
+                80% { fill: #60a5fa; }
                 100% { fill: #a3e635; }
               }
-              @keyframes pulseRedGlow {
+              @keyframes pulseCyanGlow {
                 0%, 100% { opacity: 0.8; }
                 50% { opacity: 1; }
               }
-              .flash-red-validator {
-                animation: flashRed 1.2s ease-in-out;
+              .flash-cyan-validator {
+                animation: flashCyan 1.2s ease-in-out;
               }
-              .flash-red-glow {
-                animation: pulseRedGlow 1.2s ease-in-out;
+              .flash-cyan-glow {
+                animation: pulseCyanGlow 1.2s ease-in-out;
               }
             `}</style>
             
@@ -317,9 +317,9 @@ export function ValidatorWorldMap({ validators }: ValidatorWorldMapProps) {
                     cx={pos.x}
                     cy={pos.y}
                     r={size * 3}
-                    fill={validator.address.toLowerCase() === latestBlockMiner ? `url(#glow-red-${index})` : `url(#glow-${index})`}
+                    fill={validator.address.toLowerCase() === latestBlockMiner ? `url(#glow-cyan-${index})` : `url(#glow-${index})`}
                     opacity="0.6"
-                    className={validator.address.toLowerCase() === latestBlockMiner ? 'flash-red-glow' : ''}
+                    className={validator.address.toLowerCase() === latestBlockMiner ? 'flash-cyan-glow' : ''}
                     style={{ transition: 'fill 0.1s ease-in-out' }}
                   >
                     <animate
@@ -337,10 +337,10 @@ export function ValidatorWorldMap({ validators }: ValidatorWorldMapProps) {
                       <stop offset="50%" stopColor="#a3e635" stopOpacity="0.4" />
                       <stop offset="100%" stopColor="#a3e635" stopOpacity="0" />
                     </radialGradient>
-                    <radialGradient id={`glow-red-${index}`}>
-                      <stop offset="0%" stopColor="#ef4444" stopOpacity="1" />
-                      <stop offset="50%" stopColor="#f97316" stopOpacity="0.6" />
-                      <stop offset="100%" stopColor="#ef4444" stopOpacity="0" />
+                    <radialGradient id={`glow-cyan-${index}`}>
+                      <stop offset="0%" stopColor="#06b6d4" stopOpacity="1" />
+                      <stop offset="50%" stopColor="#22d3ee" stopOpacity="0.6" />
+                      <stop offset="100%" stopColor="#60a5fa" stopOpacity="0" />
                     </radialGradient>
                   </defs>
                   
@@ -355,7 +355,7 @@ export function ValidatorWorldMap({ validators }: ValidatorWorldMapProps) {
                     cursor="pointer"
                     onMouseEnter={() => setHoveredValidator(validator)}
                     onMouseLeave={() => setHoveredValidator(null)}
-                    className={validator.address.toLowerCase() === latestBlockMiner ? 'flash-red-validator' : ''}
+                    className={validator.address.toLowerCase() === latestBlockMiner ? 'flash-cyan-validator' : ''}
                     style={{ 
                       transition: 'fill 0.1s ease-in-out',
                       willChange: validator.address.toLowerCase() === latestBlockMiner ? 'fill' : 'auto'
