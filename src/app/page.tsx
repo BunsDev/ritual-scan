@@ -352,44 +352,26 @@ export default function HomePage() {
         <div className="bg-white/5">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              <div className="bg-black/50 border border-lime-500/20 rounded-lg p-4">
-                <div className="flex items-center space-x-3">
-                  <div className="text-lime-400">RITUAL PRICE</div>
-                </div>
-                <div className="mt-2">
-                  <div className="text-2xl font-bold text-white">Higher</div>
-                  <div className="text-sm text-lime-300">Trending upward</div>
-                </div>
+              <div className="bg-black/50 border border-lime-500/20 rounded-lg p-6">
+                <div className="text-lime-400 text-sm mb-2">RITUAL PRICE</div>
+                <div className="text-3xl font-bold text-white">Higher</div>
               </div>
               
-              <div className="bg-black/50 border border-lime-500/20 rounded-lg p-4">
-                <div className="flex items-center space-x-3">
-                  <div className="text-lime-400">RECENT TRANSACTIONS</div>
-                </div>
-                <div className="mt-2">
-                  <div className="text-2xl font-bold text-white">{initialLoading ? '...' : stats.recentTransactions.length.toLocaleString()}</div>
-                  <div className="text-sm text-lime-300">From last 3 blocks</div>
+              <div className="bg-black/50 border border-lime-500/20 rounded-lg p-6">
+                <div className="text-lime-400 text-sm mb-2">RECENT TRANSACTIONS</div>
+                <div className="text-3xl font-bold text-white">{initialLoading ? '...' : stats.recentTransactions.length.toLocaleString()}</div>
+              </div>
+
+              <div className="bg-black/50 border border-lime-500/20 rounded-lg p-6">
+                <div className="text-lime-400 text-sm mb-2">MED GAS PRICE</div>
+                <div className="text-3xl font-bold text-white">
+                  {initialLoading ? '...' : stats.gasPrice < 0.01 ? `${(stats.gasPrice * 1e9).toFixed(0)}e-9 Gwei` : `${stats.gasPrice.toFixed(2)} Gwei`}
                 </div>
               </div>
 
-              <div className="bg-black/50 border border-lime-500/20 rounded-lg p-4">
-                <div className="flex items-center space-x-3">
-                  <div className="text-lime-400">MED GAS PRICE</div>
-                </div>
-                <div className="mt-2">
-                  <div className="text-2xl font-bold text-white">
-                    {initialLoading ? '...' : stats.gasPrice < 0.01 ? `${(stats.gasPrice * 1e9).toFixed(0)}e-9 Gwei` : `${stats.gasPrice.toFixed(2)} Gwei`}
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-black/50 border border-lime-500/20 rounded-lg p-4">
-                <div className="flex items-center space-x-3">
-                  <div className="text-lime-400">LAST FINALIZED BLOCK</div>
-                </div>
-                <div className="mt-2">
-                  <div className="text-2xl font-bold text-white">{initialLoading ? '...' : stats.latestBlock.toLocaleString()}</div>
-                </div>
+              <div className="bg-black/50 border border-lime-500/20 rounded-lg p-6">
+                <div className="text-lime-400 text-sm mb-2">LAST FINALIZED BLOCK</div>
+                <div className="text-3xl font-bold text-white">{initialLoading ? '...' : stats.latestBlock.toLocaleString()}</div>
               </div>
             </div>
           </div>
