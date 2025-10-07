@@ -385,9 +385,6 @@ export default function HomePage() {
                   <div className="text-2xl font-bold text-white">
                     {initialLoading ? '...' : stats.gasPrice < 0.01 ? `${(stats.gasPrice * 1e9).toFixed(0)}e-9 Gwei` : `${stats.gasPrice.toFixed(2)} Gwei`}
                   </div>
-                  <div className="text-sm text-lime-300">
-                    {initialLoading ? '...' : `($${(stats.gasPrice * 2500 * 0.000000001).toFixed(6)})`}
-                  </div>
                 </div>
               </div>
 
