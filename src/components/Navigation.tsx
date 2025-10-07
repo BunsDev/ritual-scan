@@ -45,7 +45,7 @@ export function Navigation({ currentPage }: NavigationProps) {
                 currentPage === item.key ? (
                   <span 
                     key={item.key}
-                    className="relative text-white bg-lime-500/10 border border-lime-500/30 rounded-lg px-4 py-2 text-sm font-medium shadow-lg inline-flex items-center h-[38px]"
+                    className="relative text-white bg-lime-500/10 border border-lime-500/30 rounded-lg px-3 py-1.5 text-xs font-medium shadow-lg inline-flex items-center h-[32px]"
                   >
                     <span className="relative z-10">{item.label}</span>
                     <div className="absolute inset-0 bg-lime-500/5 rounded-lg"></div>
@@ -54,7 +54,7 @@ export function Navigation({ currentPage }: NavigationProps) {
                   <a 
                     key={item.key}
                     href={item.href}
-                    className="text-lime-300/90 hover:text-white hover:bg-white/5 rounded-lg px-4 py-2 text-sm font-medium transition-all duration-200 hover:shadow-md border border-transparent hover:border-lime-500/20 inline-flex items-center h-[38px]"
+                    className="text-lime-300/90 hover:text-white hover:bg-white/5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all duration-200 hover:shadow-md border border-transparent hover:border-lime-500/20 inline-flex items-center h-[32px]"
                   >
                     {item.label}
                   </a>
@@ -66,23 +66,23 @@ export function Navigation({ currentPage }: NavigationProps) {
                 <button 
                   className={`${
                     currentPage === 'charts' || currentPage === 'stats'
-                      ? 'relative text-white bg-lime-500/10 border border-lime-500/30 rounded-lg px-4 py-2 text-sm font-medium shadow-lg'
-                      : 'text-lime-300/90 hover:text-white hover:bg-white/5 rounded-lg px-4 py-2 text-sm font-medium transition-all duration-200 hover:shadow-md border border-transparent hover:border-lime-500/20'
-                  } inline-flex items-center gap-1 h-[38px]`}
+                      ? 'relative text-white bg-lime-500/10 border border-lime-500/30 rounded-lg px-3 py-1.5 text-xs font-medium shadow-lg'
+                      : 'text-lime-300/90 hover:text-white hover:bg-white/5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all duration-200 hover:shadow-md border border-transparent hover:border-lime-500/20'
+                  } inline-flex items-center gap-1 h-[32px]`}
                 >
                   Analytics
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                   </svg>
                 </button>
-                <div className="absolute right-0 top-full mt-2 w-56 bg-black/95 border border-lime-500/20 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-                  <div className="py-2">
+                <div className="absolute right-0 top-full mt-2 w-48 bg-black/95 border border-lime-500/20 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                  <div className="py-1">
                     {ANALYTICS_ITEMS.map((item) => (
                       <Link 
                         key={item.key}
                         href={item.href}
                         prefetch={false}
-                        className={`block px-4 py-2 text-sm transition-colors ${
+                        className={`block px-3 py-1.5 text-xs transition-colors ${
                           currentPage === item.key
                             ? 'text-white bg-lime-500/10 font-medium'
                             : 'text-lime-300 hover:text-white hover:bg-lime-500/10'
@@ -97,8 +97,8 @@ export function Navigation({ currentPage }: NavigationProps) {
             </nav>
             
             {/* Connect Wallet Button - aligned with nav */}
-            <div className="flex items-center h-[38px] ml-2">
-              <div className="scale-90">
+            <div className="flex items-center h-[32px] ml-2">
+              <div className="scale-75 origin-right">
                 <ConnectWalletButton />
               </div>
             </div>
