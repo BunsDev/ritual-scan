@@ -55,7 +55,7 @@ export default function HomePage() {
       const allRecentTransactions: any[] = []
       for (const block of recentBlocks.slice(0, 3)) { // Last 3 blocks like the label says
         if (block.transactions && Array.isArray(block.transactions)) {
-          for (const tx of block.transactions.slice(0, 5)) { // Limit per block
+          for (const tx of block.transactions) { // No limit - count all transactions
             if (tx && typeof tx === 'object' && tx.hash) {
               allRecentTransactions.push({
                 hash: tx.hash,
@@ -65,10 +65,8 @@ export default function HomePage() {
                 value: tx.value,
                 timestamp: block.timestamp || Date.now() / 1000
               })
-              if (allRecentTransactions.length >= 15) break // Max 15 total
             }
           }
-          if (allRecentTransactions.length >= 15) break
         }
       }
       
@@ -100,7 +98,7 @@ export default function HomePage() {
           gasPrice: realtimeStats.gasPrice,
           // Update transactions from real-time feed - prioritize live feed over block-based count
           recentTransactions: transactionFeed.length > 0 ? 
-            transactionFeed.slice(0, 15).map(tx => ({ hash: tx.hash, status: tx.status })) :
+            transactionFeed.map(tx => ({ hash: tx.hash, status: tx.status })) :
             prev.recentTransactions // Keep existing if no live feed yet
         }
       })
@@ -200,12 +198,12 @@ export default function HomePage() {
       console.log('🔍 Loading recent transactions from', recentBlocks.length, 'blocks')
       console.log('🔍 Recent blocks:', recentBlocks.map(b => `${b.number}(${b.transactions?.length || 0} txs)`))
       
-      for (const block of recentBlocks.slice(0, 3)) { // Only check first 3 blocks for faster loading
+      for (const block of recentBlocks.slice(0, 3)) { // Only check first 3 blocks
         if (block.transactions && Array.isArray(block.transactions) && block.transactions.length > 0) {
           console.log(`📦 Block ${block.number} has ${block.transactions.length} transactions`)
           
           // Transactions are already full objects when includeTransactions=true
-          for (const tx of block.transactions.slice(0, 3)) {
+          for (const tx of block.transactions) { // No limit - count all transactions
             if (tx && typeof tx === 'object' && tx.hash) {
               console.log(`✅ Processing transaction object: ${tx.hash}`)
               recentTransactions.push({
@@ -213,7 +211,6 @@ export default function HomePage() {
                 timestamp: block.timestamp || Date.now() / 1000
               })
               console.log(`✅ Added transaction ${tx.hash.slice(0, 10)}... from block ${block.number}`)
-              if (recentTransactions.length >= 10) break
             } else if (typeof tx === 'string' && tx.startsWith('0x')) {
               // Fallback: if we get hashes instead of objects, fetch them
               try {
@@ -225,7 +222,6 @@ export default function HomePage() {
                     timestamp: block.timestamp || Date.now() / 1000
                   })
                   console.log(`✅ Added fetched transaction ${txData.hash.slice(0, 10)}... from block ${block.number}`)
-                  if (recentTransactions.length >= 10) break
                 }
               } catch (txError) {
                 console.warn(`❌ Failed to fetch transaction ${tx}:`, txError)
@@ -234,7 +230,6 @@ export default function HomePage() {
               console.warn(`⚠️ Invalid transaction format:`, typeof tx, tx)
             }
           }
-          if (recentTransactions.length >= 10) break
         } else {
           console.log(`📦 Block ${block.number} has no transactions or invalid transaction format`)
           console.log(`📦 Block transactions data:`, block.transactions)
