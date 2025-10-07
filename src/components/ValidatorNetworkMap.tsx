@@ -224,7 +224,7 @@ export function ValidatorNetworkMap({ validators }: ValidatorNetworkMapProps) {
         <div>
           <h3 className="text-lg font-semibold text-white">Validator Network Topology</h3>
           <p className="text-sm text-lime-300">
-            {validators.length} active validators • Full mesh connectivity
+            {validators.length} active proposers • Full mesh connectivity
           </p>
         </div>
         <div className="text-xs text-lime-400 bg-lime-900/20 px-3 py-1 rounded-full border border-lime-500/30">
