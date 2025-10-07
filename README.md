@@ -52,13 +52,13 @@ Real-time network overview with latest blocks, transactions, and live stats
 
 ### Charts Dashboard
 
-![Charts Dashboard](./docs/screenshots/analytics.png)
+![Charts Dashboard](./docs/screenshots/charts.png)
 
 Visual analytics with gas usage, transaction counts, and performance metrics
 
 ### Ritual Chain Stats
 
-![Ritual Chain Stats](./docs/screenshots/ritual-analytics.png)
+![Ritual Chain Stats](./docs/screenshots/stats.png)
 
 Async adoption metrics, protocol fees, and transaction type distribution
 
@@ -74,11 +74,29 @@ Real-time block list with live updates via WebSocket
 
 Geographic visualization of validator network with activity metrics
 
+### Network Leaderboard
+
+![Network Leaderboard](./docs/screenshots/leaderboard.png)
+
+Top validators and network participants ranked by activity
+
 ### Live Mempool Monitor
 
 ![Live Mempool Monitor](./docs/screenshots/mempool.png)
 
 Real-time pending transactions and scheduled jobs
+
+### Scheduled Transactions
+
+![Scheduled Transactions](./docs/screenshots/mempool-scheduled.png)
+
+Scheduled transactions waiting to execute
+
+### Async Transactions
+
+![Async Transactions](./docs/screenshots/mempool-async.png)
+
+Async commitment and settlement transactions
 
 ### RPC Configuration
 
