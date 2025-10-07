@@ -28,7 +28,7 @@ export function ConnectWalletButton() {
       console.log('Sending 100 RITUAL from faucet...')
       
       const config = rethClient.getConfiguration()
-      const rpcUrl = config.primary || 'http://35.185.119.14:8545'
+      const rpcUrl = config.primary || 'http://104.196.102.16:8545'
       
       // On HTTPS, use /api/rpc-proxy to avoid mixed content
       const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:'
@@ -103,7 +103,7 @@ export function ConnectWalletButton() {
     setAddingNetwork(true)
     try {
       const config = rethClient.getConfiguration()
-      let rpcUrl = config.primary || 'http://35.185.119.14:8545'
+      let rpcUrl = config.primary || 'http://104.196.102.16:8545'
       
       // MetaMask requires HTTPS for all non-localhost RPC URLs
       // Convert http://IP:PORT to https://IP:PORT

@@ -116,17 +116,17 @@ export class RETHClient {
 
   constructor(initialConfig?: RpcConfig) {
     const defaultConfig: RpcConfig = {
-      primary: process.env.NEXT_PUBLIC_RETH_RPC_URL || 'http://35.185.119.14:8545',
-      websocket: process.env.NEXT_PUBLIC_RETH_WS_URL || 'ws://35.185.119.14:8546',
+      primary: process.env.NEXT_PUBLIC_RETH_RPC_URL || 'http://104.196.102.16:8545',
+      websocket: process.env.NEXT_PUBLIC_RETH_WS_URL || 'ws://104.196.102.16:8546',
       name: 'Default RETH'
     }
     
     this.config = initialConfig || defaultConfig
     this.rpcUrl = this.config.primary
     this.backupRpcUrl = this.config.backup || this.config.primary
-    this.wsUrl = this.config.websocket || 'ws://35.185.119.14:8546'
+    this.wsUrl = this.config.websocket || 'ws://104.196.102.16:8546'
     
-    // FORCE MIGRATION to new RPC endpoint 35.185.119.14
+    // FORCE MIGRATION to new RPC endpoint 104.196.102.16
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('reth-client-config')
       if (saved) {
@@ -142,7 +142,7 @@ export class RETHClient {
                           savedConfig.websocket?.includes('35.185.40.237')
           
           if (hasOldIP) {
-            console.log('🔄 FORCE MIGRATING RPC config from old IP to 35.185.119.14')
+            console.log('🔄 FORCE MIGRATING RPC config from old IP to 104.196.102.16')
             console.log('Old config:', savedConfig)
             
             // Clear localStorage completely and use new defaults
@@ -154,7 +154,7 @@ export class RETHClient {
             this.config = defaultConfig
             this.rpcUrl = this.config.primary
             this.backupRpcUrl = this.config.backup || this.config.primary
-            this.wsUrl = this.config.websocket || 'ws://35.185.119.14:8546'
+            this.wsUrl = this.config.websocket || 'ws://104.196.102.16:8546'
             
             // Save new config
             this.updateConfiguration(this.config, true)
@@ -175,7 +175,7 @@ export class RETHClient {
     this.config = { ...newConfig }
     this.rpcUrl = this.config.primary
     this.backupRpcUrl = this.config.backup || this.config.primary
-    this.wsUrl = this.config.websocket || 'ws://35.185.119.14:8546'
+    this.wsUrl = this.config.websocket || 'ws://104.196.102.16:8546'
     
     if (persist && typeof window !== 'undefined') {
       localStorage.setItem('reth-client-config', JSON.stringify(this.config))

@@ -24,14 +24,14 @@ export default function SettingsPage() {
   const [presets] = useState<RpcConfig[]>([
     {
       name: 'Default Shrinenet',
-      primary: 'http://35.185.119.14:8545',
+      primary: 'http://104.196.102.16:8545',
       backup: 'http://130.211.246.58:8545',
-      websocket: 'ws://35.185.119.14:8546'
+      websocket: 'ws://104.196.102.16:8546'
     },
     {
       name: 'Shrinenet Backup',
       primary: 'http://130.211.246.58:8545',
-      backup: 'http://35.185.119.14:8545',
+      backup: 'http://104.196.102.16:8545',
       websocket: 'ws://130.211.246.58:8546'
     }
   ])
@@ -272,13 +272,13 @@ export default function SettingsPage() {
                   />
                   <p className="text-lime-400 text-xs">Required for real-time updates</p>
                   {typeof window !== 'undefined' && window.location.protocol === 'https:' && 
-                   config.websocket && config.websocket !== 'ws://35.185.119.14:8546' && (
+                   config.websocket && config.websocket !== 'ws://104.196.102.16:8546' && (
                     <div className="mt-2 p-3 bg-yellow-900/20 border border-yellow-600/30 rounded-md">
                       <p className="text-yellow-300 text-xs flex items-start gap-2">
                         <span className="text-yellow-400 flex-shrink-0">⚠️</span>
                         <span>
                           <strong>HTTPS Limitation:</strong> Custom WebSocket URLs may fall back to polling on HTTPS.
-                          Default URL (ws://35.185.119.14:8546) uses Cloudflare Tunnel for real-time updates.
+                          Default URL (ws://104.196.102.16:8546) uses Cloudflare Tunnel for real-time updates.
                           For full WebSocket support with custom RPC, use HTTP deployment or add your RPC to the tunnel route.
                         </span>
                       </p>

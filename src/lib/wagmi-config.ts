@@ -13,12 +13,12 @@ export const ritualChain = {
   },
   rpcUrls: {
     default: {
-      http: ['http://35.185.119.14:8545'],
-      webSocket: ['ws://35.185.119.14:8546'],
+      http: ['http://104.196.102.16:8545'],
+      webSocket: ['ws://104.196.102.16:8546'],
     },
     public: {
-      http: ['http://35.185.119.14:8545'],
-      webSocket: ['ws://35.185.119.14:8546'],
+      http: ['http://104.196.102.16:8545'],
+      webSocket: ['ws://104.196.102.16:8546'],
     },
   },
   blockExplorers: {
@@ -46,7 +46,7 @@ export const config = createConfig({
     }),
   ],
   transports: {
-    [ritualChain.id]: http('http://35.185.119.14:8545'),
+    [ritualChain.id]: http('http://104.196.102.16:8545'),
     [mainnet.id]: http(),
   },
 })
