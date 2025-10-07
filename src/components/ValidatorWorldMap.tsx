@@ -32,6 +32,83 @@ function latLonToSVG(lat: number, lon: number, width: number, height: number) {
   return { x, y }
 }
 
+// Detect and resolve overlapping validator positions
+function resolveOverlaps(
+  validators: Array<{ address: string; lat: number; lon: number; percentage: number }>,
+  width: number,
+  height: number,
+  overlapThreshold: number = 25 // pixels
+): Map<string, { x: number; y: number }> {
+  const positions = new Map<string, { x: number; y: number }>()
+  
+  // First pass: calculate raw positions
+  const rawPositions = validators.map(v => ({
+    address: v.address,
+    pos: latLonToSVG(v.lat, v.lon, width, height),
+    percentage: v.percentage
+  }))
+  
+  // Second pass: detect overlaps and create groups
+  const processed = new Set<string>()
+  const groups: Array<typeof rawPositions> = []
+  
+  rawPositions.forEach((validator, i) => {
+    if (processed.has(validator.address)) return
+    
+    // Find all validators within overlap threshold
+    const group = [validator]
+    processed.add(validator.address)
+    
+    rawPositions.forEach((other, j) => {
+      if (i !== j && !processed.has(other.address)) {
+        const dx = validator.pos.x - other.pos.x
+        const dy = validator.pos.y - other.pos.y
+        const distance = Math.sqrt(dx * dx + dy * dy)
+        
+        if (distance < overlapThreshold) {
+          group.push(other)
+          processed.add(other.address)
+        }
+      }
+    })
+    
+    groups.push(group)
+  })
+  
+  // Third pass: arrange each group in a radial pattern
+  groups.forEach(group => {
+    if (group.length === 1) {
+      // No overlap, use original position
+      positions.set(group[0].address, group[0].pos)
+    } else {
+      // Multiple validators - arrange in circle
+      // Sort by percentage (largest in center)
+      group.sort((a, b) => b.percentage - a.percentage)
+      
+      // Calculate centroid
+      const centroidX = group.reduce((sum, v) => sum + v.pos.x, 0) / group.length
+      const centroidY = group.reduce((sum, v) => sum + v.pos.y, 0) / group.length
+      
+      // Largest validator stays at center
+      positions.set(group[0].address, { x: centroidX, y: centroidY })
+      
+      // Others arranged in circle around it
+      const radius = 22 // pixels
+      const angleStep = (2 * Math.PI) / (group.length - 1)
+      
+      group.slice(1).forEach((validator, index) => {
+        const angle = index * angleStep
+        positions.set(validator.address, {
+          x: centroidX + radius * Math.cos(angle),
+          y: centroidY + radius * Math.sin(angle)
+        })
+      })
+    }
+  })
+  
+  return positions
+}
+
 // Geographic distribution for validators (placeholder until real IPs available)
 const validatorRegions = [
   { city: 'New York', country: 'USA', lat: 40.7128, lon: -74.0060 },
@@ -191,6 +268,18 @@ export function ValidatorWorldMap({ validators }: ValidatorWorldMapProps) {
   const mapWidth = 1000
   const mapHeight = 500
 
+  // Calculate adjusted positions to resolve overlaps
+  const adjustedPositions = resolveOverlaps(
+    validatorLocations.map(v => ({
+      address: v.address,
+      lat: v.lat,
+      lon: v.lon,
+      percentage: v.percentage
+    })),
+    mapWidth,
+    mapHeight
+  )
+
   return (
     <div className="bg-gradient-to-br from-lime-900/10 to-black border border-lime-500/20 rounded-lg p-6 mb-8">
       <div className="mb-4">
@@ -275,10 +364,11 @@ export function ValidatorWorldMap({ validators }: ValidatorWorldMapProps) {
           {/* Connection lines (subtle, sample connections) */}
           <g id="connections" opacity="0.3">
             {validatorLocations.slice(0, 20).map((source, i) => {
-              const sourcePos = latLonToSVG(source.lat, source.lon, mapWidth, mapHeight)
+              // Use adjusted positions for connections too
+              const sourcePos = adjustedPositions.get(source.address) || latLonToSVG(source.lat, source.lon, mapWidth, mapHeight)
               // Connect to next 2-3 validators
               return validatorLocations.slice(i + 1, i + 3).map((target, j) => {
-                const targetPos = latLonToSVG(target.lat, target.lon, mapWidth, mapHeight)
+                const targetPos = adjustedPositions.get(target.address) || latLonToSVG(target.lat, target.lon, mapWidth, mapHeight)
                 return (
                   <line
                     key={`conn-${i}-${j}`}
@@ -305,7 +395,8 @@ export function ValidatorWorldMap({ validators }: ValidatorWorldMapProps) {
           {/* Validator nodes */}
           <g id="validators">
             {validatorLocations.map((validator, index) => {
-              const pos = latLonToSVG(validator.lat, validator.lon, mapWidth, mapHeight)
+              // Use adjusted position to avoid overlaps
+              const pos = adjustedPositions.get(validator.address) || latLonToSVG(validator.lat, validator.lon, mapWidth, mapHeight)
               // Size based on percentage of total blocks (4-16px range)
               const percentage = validator.percentage || 0
               const size = Math.max(4, Math.min(16, 4 + (percentage / 100) * 12))
