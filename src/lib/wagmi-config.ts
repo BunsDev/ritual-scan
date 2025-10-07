@@ -1,6 +1,6 @@
 import { http, createConfig } from 'wagmi'
 import { mainnet } from 'wagmi/chains'
-import { injected, walletConnect, coinbaseWallet } from 'wagmi/connectors'
+import { injected, walletConnect, coinbaseWallet, metaMask } from 'wagmi/connectors'
 
 // Define Ritual Chain
 export const ritualChain = {
@@ -29,6 +29,7 @@ export const ritualChain = {
 export const config = createConfig({
   chains: [ritualChain, mainnet],
   connectors: [
+    metaMask(),
     injected(),
     walletConnect({
       projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || 'YOUR_WALLETCONNECT_PROJECT_ID',

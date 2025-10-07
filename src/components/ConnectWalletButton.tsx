@@ -2,6 +2,7 @@
 
 import { useAccount, useConnect, useDisconnect, useEnsName } from 'wagmi'
 import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { rethClient } from '@/lib/reth-client'
 import { createPublicClient, createWalletClient, http, parseEther } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
@@ -158,6 +159,20 @@ export function ConnectWalletButton() {
     setMounted(true)
   }, [])
 
+  // Prevent body scroll when modal is open
+  useEffect(() => {
+    if (showModal) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = 'unset'
+    }
+    
+    // Cleanup on unmount
+    return () => {
+      document.body.style.overflow = 'unset'
+    }
+  }, [showModal])
+
   if (!mounted) {
     return (
       <button className="px-4 py-2 bg-lime-600 text-white rounded-lg text-sm font-medium inline-flex items-center h-[38px]">
@@ -229,9 +244,20 @@ export function ConnectWalletButton() {
       </button>
 
       {/* Wallet Selection Modal */}
-      {showModal && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-black border-2 border-lime-500/50 rounded-xl p-6 max-w-md w-full mx-4 shadow-2xl">
+      {showModal && mounted && createPortal(
+        <div 
+          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[9999] p-4" 
+          style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowModal(false)
+            }
+          }}
+        >
+          <div 
+            className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-black border-2 border-lime-500/50 rounded-xl p-6 max-w-md w-full max-h-[90vh] overflow-y-auto shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-bold text-white">Connect Wallet</h2>
               <button
@@ -283,7 +309,8 @@ export function ConnectWalletButton() {
               </p>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   )
