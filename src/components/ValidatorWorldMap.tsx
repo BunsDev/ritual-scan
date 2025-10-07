@@ -422,9 +422,25 @@ export function ValidatorWorldMap({ validators, hoveredFromTable }: ValidatorWor
             })}
           </g>
 
-          {/* Validator nodes */}
+          {/* Validator nodes - render active validator last (appears on top) */}
           <g id="validators">
-            {validatorLocations.map((validator, index) => {
+            {validatorLocations
+              .sort((a, b) => {
+                // Render order: normal → table-hovered → active (top)
+                const aIsActive = a.address.toLowerCase() === latestBlockMiner?.toLowerCase()
+                const bIsActive = b.address.toLowerCase() === latestBlockMiner?.toLowerCase()
+                const aIsHovered = a.address.toLowerCase() === hoveredFromTable?.toLowerCase()
+                const bIsHovered = b.address.toLowerCase() === hoveredFromTable?.toLowerCase()
+                
+                // Active on top
+                if (aIsActive && !bIsActive) return 1
+                if (!aIsActive && bIsActive) return -1
+                // Then hovered from table
+                if (aIsHovered && !bIsHovered) return 1
+                if (!aIsHovered && bIsHovered) return -1
+                return 0
+              })
+              .map((validator, index) => {
               // Use adjusted position to avoid overlaps
               const pos = adjustedPositions.get(validator.address) || latLonToSVG(validator.lat, validator.lon, mapWidth, mapHeight)
               // Log-proportional size: size ~ log(1 + activity_share)
