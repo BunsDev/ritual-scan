@@ -32,6 +32,16 @@ function latLonToSVG(lat: number, lon: number, width: number, height: number) {
   return { x, y }
 }
 
+// Deterministic pseudo-random based on string (for consistent positioning)
+function seededRandom(seed: string): number {
+  let hash = 0
+  for (let i = 0; i < seed.length; i++) {
+    hash = ((hash << 5) - hash) + seed.charCodeAt(i)
+    hash = hash & hash // Convert to 32bit integer
+  }
+  return Math.abs(Math.sin(hash)) // 0 to 1
+}
+
 // Detect and resolve overlapping validator positions
 // Performance: O(n²) for overlap detection, but memoized so only runs when validator set changes
 // With typical n < 100 validators, this is negligible (~10ms)
@@ -84,26 +94,35 @@ function resolveOverlaps(
       // No overlap, use original position
       positions.set(group[0].address, group[0].pos)
     } else {
-      // Multiple validators in same location - arrange in circle
-      // Sort by percentage (largest validator in center)
+      // Multiple validators in same location - spread with randomization
+      // Add random jitter to break geometric patterns
       group.sort((a, b) => b.percentage - a.percentage)
       
       // Calculate centroid
       const centroidX = group.reduce((sum, v) => sum + v.pos.x, 0) / group.length
       const centroidY = group.reduce((sum, v) => sum + v.pos.y, 0) / group.length
       
-      // Largest validator stays at center
-      positions.set(group[0].address, { x: centroidX, y: centroidY })
+      // Largest validator near center with deterministic jitter (based on address)
+      const centerJitterX = (seededRandom(group[0].address + 'x') - 0.5) * 8
+      const centerJitterY = (seededRandom(group[0].address + 'y') - 0.5) * 8
+      positions.set(group[0].address, { 
+        x: centroidX + centerJitterX, 
+        y: centroidY + centerJitterY 
+      })
       
-      // Others arranged in circle around it
-      const radius = 22 // pixels
-      const angleStep = (2 * Math.PI) / (group.length - 1)
+      // Others scattered with deterministic randomization (based on address)
+      const baseRadius = 10 // Reduced from 20 to 10 (more packed)
+      const randomAngleOffset = seededRandom(group[0].address + 'angle') * 2 * Math.PI
       
       group.slice(1).forEach((validator, index) => {
-        const angle = index * angleStep
+        // Deterministic jitter based on validator address
+        const angleJitter = (seededRandom(validator.address + 'jitter') - 0.5) * 0.8 // ±0.4 radians
+        const angle = randomAngleOffset + (index * 2 * Math.PI / (group.length - 1)) + angleJitter
+        const radiusVariation = baseRadius + (seededRandom(validator.address + 'radius') - 0.5) * 6 // ±3px
+        
         positions.set(validator.address, {
-          x: centroidX + radius * Math.cos(angle),
-          y: centroidY + radius * Math.sin(angle)
+          x: centroidX + radiusVariation * Math.cos(angle),
+          y: centroidY + radiusVariation * Math.sin(angle)
         })
       })
     }
@@ -403,24 +422,24 @@ export function ValidatorWorldMap({ validators }: ValidatorWorldMapProps) {
             {validatorLocations.map((validator, index) => {
               // Use adjusted position to avoid overlaps
               const pos = adjustedPositions.get(validator.address) || latLonToSVG(validator.lat, validator.lon, mapWidth, mapHeight)
-              // Size based on percentage of total blocks (3-10px range - smaller for cleaner look)
+              // Log-proportional size: size ~ log(1 + activity_share)
               const percentage = validator.percentage || 0
-              const size = Math.max(3, Math.min(10, 3 + (percentage / 100) * 7))
+              const size = Math.max(3, Math.min(12, 3 + Math.log(1 + percentage) * 1.5))
               
               return (
                 <g key={validator.address}>
-                  {/* Subtle red glow (pulsing) */}
+                  {/* Very subtle red glow (barely visible) */}
                   <circle
                     cx={pos.x}
                     cy={pos.y}
-                    r={size * 2}
+                    r={size * 1.5}
                     fill="url(#red-glow)"
-                    opacity="0.4"
+                    opacity="0.15"
                   >
                     <animate
                       attributeName="opacity"
-                      values="0.2;0.5;0.2"
-                      dur="3s"
+                      values="0.1;0.2;0.1"
+                      dur="4s"
                       repeatCount="indefinite"
                     />
                   </circle>
