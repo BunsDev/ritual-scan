@@ -62,8 +62,15 @@ export default function RitualAnalyticsPage() {
     const commitmentBlocks = new Map<string, number>() // originTx -> block number
     const settlementTimes: number[] = []
 
+    // IMPORTANT: Process blocks in chronological order (oldest first) so commitments are tracked before settlements
+    const sortedBlocks = [...blocks].sort((a, b) => {
+      const blockA = typeof a.number === 'number' ? a.number : parseInt(a.number, 16)
+      const blockB = typeof b.number === 'number' ? b.number : parseInt(b.number, 16)
+      return blockA - blockB
+    })
+
     // Process each block's transactions
-    for (const block of blocks) {
+    for (const block of sortedBlocks) {
       if (!block.transactions) continue
       
       const blockTxCount = Array.isArray(block.transactions) ? block.transactions.length : 0
@@ -273,8 +280,15 @@ export default function RitualAnalyticsPage() {
       const commitmentBlocks = new Map<string, number>() // originTx -> block number
       const settlementTimes: number[] = []
 
+      // IMPORTANT: Process blocks in chronological order (oldest first) so commitments are tracked before settlements
+      const sortedBlocks = [...recentBlocks].sort((a, b) => {
+        const blockA = parseInt(a.number, 16)
+        const blockB = parseInt(b.number, 16)
+        return blockA - blockB
+      })
+
       // Process each block's transactions
-      for (const block of recentBlocks) {
+      for (const block of sortedBlocks) {
         if (!block.transactions) continue
         
         const blockTxCount = Array.isArray(block.transactions) ? block.transactions.length : 0
