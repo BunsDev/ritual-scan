@@ -7,8 +7,8 @@ import { NextRequest, NextResponse } from 'next/server'
 export async function GET(request: NextRequest) {
   try {
     // Get RPC URL to determine Summit node IP
-    const rpcUrl = process.env.NEXT_PUBLIC_RETH_RPC_URL || 'http://35.196.202.163:8545'
-    const summitIp = rpcUrl.match(/https?:\/\/([^:]+)/)?.[1] || '35.196.202.163'
+    const rpcUrl = process.env.NEXT_PUBLIC_RETH_RPC_URL || 'http://35.185.119.14:8545'
+    const summitIp = rpcUrl.match(/https?:\/\/([^:]+)/)?.[1] || '35.185.119.14'
     const peerListUrl = `http://${summitIp}:3030/get_peer_list`
     
     console.log(`[Validator Peers API] Fetching from: ${peerListUrl}`)

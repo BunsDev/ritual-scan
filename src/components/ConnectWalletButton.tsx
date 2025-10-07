@@ -27,7 +27,7 @@ export function ConnectWalletButton() {
       console.log('Sending 100 RITUAL from faucet...')
       
       const config = rethClient.getConfiguration()
-      const rpcUrl = config.primary || 'http://35.196.202.163:8545'
+      const rpcUrl = config.primary || 'http://35.185.119.14:8545'
       
       // On HTTPS, use /api/rpc-proxy to avoid mixed content
       const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:'
@@ -102,7 +102,7 @@ export function ConnectWalletButton() {
     setAddingNetwork(true)
     try {
       const config = rethClient.getConfiguration()
-      let rpcUrl = config.primary || 'http://35.196.202.163:8545'
+      let rpcUrl = config.primary || 'http://35.185.119.14:8545'
       
       // MetaMask requires HTTPS for all non-localhost RPC URLs
       // Convert http://IP:PORT to https://IP:PORT
@@ -160,7 +160,7 @@ export function ConnectWalletButton() {
 
   if (!mounted) {
     return (
-      <button className="px-3 py-1.5 bg-lime-600 text-white rounded-md text-xs font-medium">
+      <button className="px-4 py-2 bg-lime-600 text-white rounded-lg text-sm font-medium inline-flex items-center h-[38px]">
         Connect Wallet
       </button>
     )
@@ -171,7 +171,7 @@ export function ConnectWalletButton() {
       <div className="relative">
         <button
           onClick={() => setShowModal(!showModal)}
-          className="px-3 py-1.5 bg-lime-600 hover:bg-lime-700 text-white rounded-md transition-colors flex items-center space-x-2 font-mono text-xs"
+          className="px-4 py-2 bg-lime-600 hover:bg-lime-700 text-white rounded-lg transition-colors inline-flex items-center space-x-2 font-mono text-sm h-[38px]"
         >
           <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse"></div>
           <span>{ensName || formatAddress(address)}</span>
@@ -223,7 +223,7 @@ export function ConnectWalletButton() {
     <>
       <button
         onClick={() => setShowModal(true)}
-        className="px-3 py-1.5 bg-lime-600 hover:bg-lime-700 text-white rounded-md transition-colors text-xs font-medium"
+        className="px-4 py-2 bg-lime-600 hover:bg-lime-700 text-white rounded-lg transition-colors text-sm font-medium inline-flex items-center h-[38px]"
       >
         Connect Wallet
       </button>

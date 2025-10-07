@@ -116,25 +116,55 @@ export class RETHClient {
 
   constructor(initialConfig?: RpcConfig) {
     const defaultConfig: RpcConfig = {
-      primary: process.env.NEXT_PUBLIC_RETH_RPC_URL || 'http://35.196.202.163:8545',
-      websocket: process.env.NEXT_PUBLIC_RETH_WS_URL || 'ws://35.196.202.163:8546',
+      primary: process.env.NEXT_PUBLIC_RETH_RPC_URL || 'http://35.185.119.14:8545',
+      websocket: process.env.NEXT_PUBLIC_RETH_WS_URL || 'ws://35.185.119.14:8546',
       name: 'Default RETH'
     }
     
     this.config = initialConfig || defaultConfig
     this.rpcUrl = this.config.primary
     this.backupRpcUrl = this.config.backup || this.config.primary
-    this.wsUrl = this.config.websocket || 'ws://35.196.202.163:8546'
+    this.wsUrl = this.config.websocket || 'ws://35.185.119.14:8546'
     
-    // Load from localStorage if available
+    // FORCE MIGRATION to new RPC endpoint 35.185.119.14
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('reth-client-config')
       if (saved) {
         try {
           const savedConfig = JSON.parse(saved)
-          this.updateConfiguration(savedConfig, false) // Don't save again
+          
+          // Check if using any old IP - if so, FORCE update to new IP
+          const hasOldIP = savedConfig.primary?.includes('34.73.191.15') || 
+                          savedConfig.primary?.includes('35.196.202.163') || 
+                          savedConfig.primary?.includes('35.185.40.237') ||
+                          savedConfig.websocket?.includes('34.73.191.15') ||
+                          savedConfig.websocket?.includes('35.196.202.163') ||
+                          savedConfig.websocket?.includes('35.185.40.237')
+          
+          if (hasOldIP) {
+            console.log('🔄 FORCE MIGRATING RPC config from old IP to 35.185.119.14')
+            console.log('Old config:', savedConfig)
+            
+            // Clear localStorage completely and use new defaults
+            localStorage.removeItem('reth-client-config')
+            localStorage.removeItem('ritual-scan-cache')
+            localStorage.removeItem('ritual-scan-leaderboard-cache')
+            
+            // Use fresh default config
+            this.config = defaultConfig
+            this.rpcUrl = this.config.primary
+            this.backupRpcUrl = this.config.backup || this.config.primary
+            this.wsUrl = this.config.websocket || 'ws://35.185.119.14:8546'
+            
+            // Save new config
+            this.updateConfiguration(this.config, true)
+            console.log('✅ Migration complete - using:', this.config)
+          } else {
+            this.updateConfiguration(savedConfig, false)
+          }
         } catch (e) {
-          console.warn('Failed to parse saved RPC config')
+          console.warn('Failed to parse saved RPC config, using defaults')
+          localStorage.removeItem('reth-client-config')
         }
       }
     }
@@ -145,7 +175,7 @@ export class RETHClient {
     this.config = { ...newConfig }
     this.rpcUrl = this.config.primary
     this.backupRpcUrl = this.config.backup || this.config.primary
-    this.wsUrl = this.config.websocket || 'ws://35.196.202.163:8546'
+    this.wsUrl = this.config.websocket || 'ws://35.185.119.14:8546'
     
     if (persist && typeof window !== 'undefined') {
       localStorage.setItem('reth-client-config', JSON.stringify(this.config))
