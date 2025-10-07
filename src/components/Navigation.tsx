@@ -28,7 +28,7 @@ export function Navigation({ currentPage }: NavigationProps) {
   return (
     <header className="border-b border-lime-500/25 bg-black/98 backdrop-blur-md shadow-lg">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-18">
+        <div className="flex justify-between items-center h-16">
           {/* Logo Section */}
           <div className="flex items-center">
             <Link href="/" className="text-2xl font-bold text-lime-400 hover:text-lime-300 transition-all duration-200 hover:scale-105">
@@ -97,8 +97,10 @@ export function Navigation({ currentPage }: NavigationProps) {
             </nav>
             
             {/* Connect Wallet Button - aligned with nav */}
-            <div className="flex items-center h-[38px]">
-              <ConnectWalletButton />
+            <div className="flex items-center h-[38px] ml-2">
+              <div className="scale-90">
+                <ConnectWalletButton />
+              </div>
             </div>
           </div>
 
