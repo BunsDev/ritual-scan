@@ -605,47 +605,57 @@ class RealtimeWebSocketManager {
     }
   }
 
-  // Enrich peer list with GeoIP data
+  // Enrich peer list with GeoIP data (OPTIMIZED: uses batch API)
   private async enrichPeersWithGeoIP() {
-    const enrichedPeers = []
+    if (this.validatorPeers.length === 0) return
     
-    for (const peer of this.validatorPeers) {
-      try {
-        // Strip port from IP address (format: "1.2.3.4:27656" → "1.2.3.4")
+    try {
+      // Prepare batch request (strip ports from IPs)
+      const batchQuery = this.validatorPeers.map(peer => {
         const ipOnly = peer.ip_address?.split(':')[0] || peer.ip_address
+        return {
+          query: ipOnly,
+          fields: 'status,country,city,lat,lon'
+        }
+      })
+      
+      // Single batch request for ALL IPs (much faster!)
+      const geoResponse = await fetch('http://ip-api.com/batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(batchQuery),
+        signal: AbortSignal.timeout(5000)
+      })
+      
+      if (geoResponse.ok) {
+        const geoResults = await geoResponse.json()
         
-        // Use ip-api.com (free, no API key needed, allows batch)
-        const geoResponse = await fetch(`http://ip-api.com/json/${ipOnly}?fields=status,country,city,lat,lon`, {
-          signal: AbortSignal.timeout(3000)
-        })
-        
-        if (geoResponse.ok) {
-          const geoData = await geoResponse.json()
-          if (geoData.status === 'success') {
-            enrichedPeers.push({
+        // Match results back to peers
+        const enrichedPeers = this.validatorPeers.map((peer, index) => {
+          const geoData = geoResults[index]
+          if (geoData?.status === 'success') {
+            return {
               ...peer,
               lat: geoData.lat,
               lon: geoData.lon,
               city: geoData.city,
               country: geoData.country,
               isReal: true
-            })
+            }
           }
-        }
-      } catch (error) {
-        // GeoIP failed, keep peer without location
-        enrichedPeers.push({ ...peer, isReal: false })
+          return { ...peer, isReal: false }
+        })
+        
+        this.validatorPeers = enrichedPeers
+        this.logImportant(`🌍 [${this.connectionId}] Enriched ${enrichedPeers.filter(p => p.isReal).length}/${enrichedPeers.length} peers with GeoIP data (batch request)`)
+        
+        // Save to localStorage immediately
+        this.saveCacheToStorage()
       }
-      
-      // Rate limit: 45 requests per minute for ip-api.com free tier
-      await new Promise(resolve => setTimeout(resolve, 1500))
+    } catch (error) {
+      console.error(`❌ [${this.connectionId}] Batch GeoIP enrichment failed:`, error)
+      // Keep peers without location data
     }
-    
-    this.validatorPeers = enrichedPeers
-    this.logImportant(`🌍 [${this.connectionId}] Enriched ${enrichedPeers.filter(p => p.isReal).length}/${enrichedPeers.length} peers with GeoIP data`)
-    
-    // Save to localStorage immediately (validator peers are precious and change slowly)
-    this.saveCacheToStorage()
   }
 
   private startHighFrequencyPolling() {
