@@ -309,25 +309,25 @@ export function ValidatorWorldMap({ validators }: ValidatorWorldMapProps) {
             viewBox={`0 0 ${mapWidth} ${mapHeight * 0.85}`}
             className="absolute inset-0 w-full h-full"
           >
-            {/* CSS Animation for cyan flash */}
+            {/* CSS Animation for red flash when validator proposes block */}
             <style>{`
-              @keyframes flashCyan {
-                0% { fill: #06b6d4; }
-                20% { fill: #22d3ee; }
-                40% { fill: #60a5fa; }
-                60% { fill: #22d3ee; }
-                80% { fill: #60a5fa; }
+              @keyframes flashRed {
+                0% { fill: #a3e635; }
+                20% { fill: #fca5a5; }
+                40% { fill: #ef4444; }
+                60% { fill: #fca5a5; }
+                80% { fill: #ef4444; }
                 100% { fill: #a3e635; }
               }
-              @keyframes pulseCyanGlow {
-                0%, 100% { opacity: 0.8; }
-                50% { opacity: 1; }
+              @keyframes pulseRedGlow {
+                0%, 100% { opacity: 0.4; }
+                50% { opacity: 0.9; }
               }
-              .flash-cyan-validator {
-                animation: flashCyan 1.2s ease-in-out;
+              .flash-red-validator {
+                animation: flashRed 1s ease-in-out;
               }
-              .flash-cyan-glow {
-                animation: pulseCyanGlow 1.2s ease-in-out;
+              .flash-red-glow {
+                animation: pulseRedGlow 1s ease-in-out;
               }
             `}</style>
             
@@ -403,91 +403,82 @@ export function ValidatorWorldMap({ validators }: ValidatorWorldMapProps) {
             {validatorLocations.map((validator, index) => {
               // Use adjusted position to avoid overlaps
               const pos = adjustedPositions.get(validator.address) || latLonToSVG(validator.lat, validator.lon, mapWidth, mapHeight)
-              // Size based on percentage of total blocks (4-16px range)
+              // Size based on percentage of total blocks (3-10px range - smaller for cleaner look)
               const percentage = validator.percentage || 0
-              const size = Math.max(4, Math.min(16, 4 + (percentage / 100) * 12))
+              const size = Math.max(3, Math.min(10, 3 + (percentage / 100) * 7))
               
               return (
                 <g key={validator.address}>
-                  {/* Glow */}
+                  {/* Subtle red glow (pulsing) */}
                   <circle
                     cx={pos.x}
                     cy={pos.y}
-                    r={size * 3}
-                    fill={validator.address.toLowerCase() === latestBlockMiner ? `url(#glow-cyan-${index})` : `url(#glow-${index})`}
-                    opacity="0.6"
-                    className={validator.address.toLowerCase() === latestBlockMiner ? 'flash-cyan-glow' : ''}
-                    style={{ transition: 'fill 0.1s ease-in-out' }}
+                    r={size * 2}
+                    fill="url(#red-glow)"
+                    opacity="0.4"
                   >
                     <animate
-                      attributeName="r"
-                      values={`${size * 2.5};${size * 3.5};${size * 2.5}`}
+                      attributeName="opacity"
+                      values="0.2;0.5;0.2"
                       dur="3s"
                       repeatCount="indefinite"
                     />
                   </circle>
                   
-                  {/* Define gradient for this node */}
-                  <defs>
-                    <radialGradient id={`glow-${index}`}>
-                      <stop offset="0%" stopColor="#8b5cf6" stopOpacity="0.8" />
-                      <stop offset="50%" stopColor="#a3e635" stopOpacity="0.4" />
-                      <stop offset="100%" stopColor="#a3e635" stopOpacity="0" />
-                    </radialGradient>
-                    <radialGradient id={`glow-cyan-${index}`}>
-                      <stop offset="0%" stopColor="#06b6d4" stopOpacity="1" />
-                      <stop offset="50%" stopColor="#22d3ee" stopOpacity="0.6" />
-                      <stop offset="100%" stopColor="#60a5fa" stopOpacity="0" />
-                    </radialGradient>
-                  </defs>
+                  {/* Active validator intense glow (when minted latest block) */}
+                  {validator.address.toLowerCase() === latestBlockMiner && (
+                    <circle
+                      cx={pos.x}
+                      cy={pos.y}
+                      r={size * 3}
+                      fill="url(#red-flash)"
+                      opacity="0.8"
+                      className="flash-red-glow"
+                    />
+                  )}
+                  
+                  {/* Define red glow gradients (shared) */}
+                  {index === 0 && (
+                    <defs>
+                      <radialGradient id="red-glow">
+                        <stop offset="0%" stopColor="#ef4444" stopOpacity="0.9" />
+                        <stop offset="50%" stopColor="#dc2626" stopOpacity="0.5" />
+                        <stop offset="100%" stopColor="#991b1b" stopOpacity="0" />
+                      </radialGradient>
+                      <radialGradient id="red-flash">
+                        <stop offset="0%" stopColor="#fca5a5" stopOpacity="1" />
+                        <stop offset="50%" stopColor="#ef4444" stopOpacity="0.8" />
+                        <stop offset="100%" stopColor="#dc2626" stopOpacity="0" />
+                      </radialGradient>
+                    </defs>
+                  )}
                   
                   {/* Node circle */}
                   <circle
                     cx={pos.x}
                     cy={pos.y}
                     r={size}
-                    fill="#a3e635"
+                    fill={validator.address.toLowerCase() === latestBlockMiner ? "#fca5a5" : "#a3e635"}
                     stroke="#ffffff"
-                    strokeWidth="1"
+                    strokeWidth="1.5"
                     cursor="pointer"
                     onMouseEnter={() => setHoveredValidator(validator)}
                     onMouseLeave={() => setHoveredValidator(null)}
-                    className={validator.address.toLowerCase() === latestBlockMiner ? 'flash-cyan-validator' : ''}
+                    className={validator.address.toLowerCase() === latestBlockMiner ? 'flash-red-validator' : ''}
                     style={{ 
-                      transition: 'fill 0.1s ease-in-out',
-                      willChange: validator.address.toLowerCase() === latestBlockMiner ? 'fill' : 'auto'
+                      transition: 'fill 0.3s ease-in-out',
+                      filter: validator.address.toLowerCase() === latestBlockMiner ? 'drop-shadow(0 0 6px #ef4444)' : 'none'
                     }}
                   />
                   
-                  {/* Inner pulse */}
+                  {/* Subtle inner highlight */}
                   <circle
                     cx={pos.x}
                     cy={pos.y}
-                    r={size * 0.5}
+                    r={size * 0.3}
                     fill="#ffffff"
-                  >
-                    <animate
-                      attributeName="opacity"
-                      values="0.5;1;0.5"
-                      dur="2s"
-                      repeatCount="indefinite"
-                    />
-                  </circle>
-                  
-                  {/* Percentage label */}
-                  {validator.percentage >= 1 && (
-                    <text
-                      x={pos.x}
-                      y={pos.y - size - 8}
-                      textAnchor="middle"
-                      fill="#ffffff"
-                      fontSize="10"
-                      fontWeight="bold"
-                      style={{ textShadow: '0 0 3px rgba(0,0,0,0.8)' }}
-                    >
-                      {Math.round(validator.percentage)}%
-                    </text>
-                  )}
+                    opacity="0.5"
+                  />
                 </g>
               )
             })}
