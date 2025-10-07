@@ -329,26 +329,14 @@ export function ValidatorWorldMap({ validators, hoveredFromTable }: ValidatorWor
             viewBox={`0 0 ${mapWidth} ${mapHeight * 0.85}`}
             className="absolute inset-0 w-full h-full"
           >
-            {/* CSS Animation for red flash when validator proposes block */}
+            {/* CSS Animation for red glow pulse */}
             <style>{`
-              @keyframes flashRed {
-                0% { fill: #a3e635; }
-                10% { fill: #fca5a5; }
-                25% { fill: #dc2626; }
-                50% { fill: #dc2626; }
-                75% { fill: #fca5a5; }
-                90% { fill: #ef4444; }
-                100% { fill: #a3e635; }
-              }
               @keyframes pulseRedGlow {
                 0% { opacity: 0.4; }
                 25% { opacity: 0.9; }
                 50% { opacity: 0.9; }
                 75% { opacity: 0.9; }
                 100% { opacity: 0.4; }
-              }
-              .flash-red-validator {
-                animation: flashRed 3s ease-in-out;
               }
               .flash-red-glow {
                 animation: pulseRedGlow 3s ease-in-out;
@@ -523,6 +511,11 @@ export function ValidatorWorldMap({ validators, hoveredFromTable }: ValidatorWor
                         <stop offset="50%" stopColor="#2563eb" stopOpacity="0.6" />
                         <stop offset="100%" stopColor="#1d4ed8" stopOpacity="0" />
                       </radialGradient>
+                      <radialGradient id="red-solid-gradient">
+                        <stop offset="0%" stopColor="#fca5a5" />
+                        <stop offset="30%" stopColor="#ef4444" />
+                        <stop offset="100%" stopColor="#dc2626" />
+                      </radialGradient>
                     </defs>
                   )}
                   
@@ -531,16 +524,15 @@ export function ValidatorWorldMap({ validators, hoveredFromTable }: ValidatorWor
                     cx={pos.x}
                     cy={pos.y}
                     r={size}
-                    fill={isHoveredFromTable ? "#60a5fa" : isActive ? "#fca5a5" : "#a3e635"}
+                    fill={isHoveredFromTable ? "#60a5fa" : isActive ? "url(#red-solid-gradient)" : "#a3e635"}
                     stroke="#ffffff"
-                    strokeWidth={isHoveredFromTable ? "2.5" : "1.5"}
+                    strokeWidth={isHoveredFromTable ? "2.5" : isActive ? "2" : "1.5"}
                     cursor="pointer"
                     onMouseEnter={() => setHoveredValidator(validator)}
                     onMouseLeave={() => setHoveredValidator(null)}
-                    className={isActive ? 'flash-red-validator' : ''}
                     style={{ 
                       transition: 'fill 0.3s ease-in-out, stroke-width 0.2s ease-in-out',
-                      filter: isActive ? 'drop-shadow(0 0 6px #ef4444)' : isHoveredFromTable ? 'drop-shadow(0 0 8px #3b82f6)' : 'none'
+                      filter: isActive ? 'drop-shadow(0 0 8px #dc2626)' : isHoveredFromTable ? 'drop-shadow(0 0 8px #3b82f6)' : 'none'
                     }}
                   />
                   
