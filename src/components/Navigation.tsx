@@ -98,9 +98,7 @@ export function Navigation({ currentPage }: NavigationProps) {
             
             {/* Connect Wallet Button - aligned with nav */}
             <div className="flex items-center h-[32px] ml-2">
-              <div className="scale-75 origin-right">
-                <ConnectWalletButton />
-              </div>
+              <ConnectWalletButton />
             </div>
           </div>
 
