@@ -202,7 +202,7 @@ export function ValidatorWorldMap({ validators }: ValidatorWorldMapProps) {
             </p>
           </div>
           <div className="text-xs text-lime-400 bg-lime-900/20 px-3 py-1 rounded-full border border-lime-500/30">
-            {validators.length} nodes • Full mesh topology
+            Full mesh topology
           </div>
         </div>
       </div>

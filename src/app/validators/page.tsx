@@ -375,7 +375,7 @@ export default function ValidatorsPage() {
           </div>
           
           <div className="bg-lime-500/5 border border-lime-500/20 rounded-lg p-4">
-            <div className="text-lime-300/70 text-sm mb-1">Active Validators</div>
+            <div className="text-lime-300/70 text-sm mb-1">Active Proposers</div>
             <div className="text-2xl font-bold text-green-400">
               {validators.filter(v => v.healthStatus === 'active').length}
             </div>
