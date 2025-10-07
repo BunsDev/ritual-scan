@@ -51,7 +51,6 @@ const validatorRegions = [
 export function ValidatorWorldMap({ validators }: ValidatorWorldMapProps) {
   const [validatorLocations, setValidatorLocations] = useState<ValidatorLocation[]>([])
   const [hoveredValidator, setHoveredValidator] = useState<ValidatorLocation | null>(null)
-  const [dataSource, setDataSource] = useState<'real' | 'placeholder'>('placeholder')
   const [latestBlockMiner, setLatestBlockMiner] = useState<string | null>(null)
 
   useEffect(() => {
@@ -101,8 +100,7 @@ export function ValidatorWorldMap({ validators }: ValidatorWorldMapProps) {
       })
       
       const realCount = locations.filter(l => l.isReal).length
-      setDataSource(realCount > 0 ? 'real' : 'placeholder')
-      console.log(`🗺️ [ValidatorMap] Using ${realCount} real locations, ${locations.length - realCount} placeholder`)
+      console.log(`🗺️ [ValidatorMap] Rendered ${realCount} real locations, ${locations.length - realCount} fallback`)
       setValidatorLocations(locations)
     } else {
       // No real data yet - use placeholder
@@ -120,22 +118,65 @@ export function ValidatorWorldMap({ validators }: ValidatorWorldMapProps) {
         }
       })
       
-      setDataSource('placeholder')
+      console.log(`🗺️ [ValidatorMap] Rendered ${locations.length} fallback locations (waiting for GeoIP)`)
       setValidatorLocations(locations)
     }
   }, [validators])
 
-  // Subscribe to new blocks to flash the latest validator
+  // Subscribe to validator peer updates (for GeoIP enrichment completion)
   useEffect(() => {
     const manager = getRealtimeManager()
     if (!manager) return
 
-    const unsubscribe = manager.subscribe('validator-map-flash', (update) => {
+    const unsubscribe = manager.subscribe('validator-map-geoip', (update) => {
+      if (update.type === 'validatorPeersUpdate') {
+        // GeoIP enrichment completed! Re-fetch and update locations
+        const enrichedPeers = manager.getCachedValidatorPeers() || []
+        
+        if (enrichedPeers.length > 0 && enrichedPeers.some(p => p.isReal)) {
+          const locations = validators.map(validator => {
+            const peer = enrichedPeers.find(p => 
+              p.coinbase_address?.toLowerCase() === validator.address.toLowerCase()
+            )
+            
+            if (peer && peer.isReal && peer.lat && peer.lon) {
+              return {
+                address: validator.address,
+                lat: peer.lat,
+                lon: peer.lon,
+                city: peer.city || 'Unknown',
+                country: peer.country || 'Unknown',
+                blocksProposed: validator.blocksProposed,
+                percentage: validator.percentage,
+                ip_address: peer.ip_address,
+                isReal: true
+              }
+            } else {
+              const region = validatorRegions[validators.indexOf(validator) % validatorRegions.length]
+              return {
+                address: validator.address,
+                lat: region.lat,
+                lon: region.lon,
+                city: region.city,
+                country: region.country,
+                blocksProposed: validator.blocksProposed,
+                percentage: validator.percentage,
+                isReal: false
+              }
+            }
+          })
+          
+          const realCount = locations.filter(l => l.isReal).length
+          console.log(`🗺️ [ValidatorMap] GeoIP enriched: ${realCount} real locations`)
+          setValidatorLocations(locations)
+        }
+      }
+      
+      // Also handle block flash
       if (update.type === 'newBlock' && update.data?.miner) {
         const minerAddress = update.data.miner.toLowerCase()
         setLatestBlockMiner(minerAddress)
         
-        // Clear the flash after animation completes (1.2s)
         setTimeout(() => {
           setLatestBlockMiner(null)
         }, 1200)
@@ -145,7 +186,7 @@ export function ValidatorWorldMap({ validators }: ValidatorWorldMapProps) {
     return () => {
       if (unsubscribe) unsubscribe()
     }
-  }, [])
+  }, [validators])
 
   const mapWidth = 1000
   const mapHeight = 500
