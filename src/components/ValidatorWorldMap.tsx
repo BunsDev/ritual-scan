@@ -333,21 +333,25 @@ export function ValidatorWorldMap({ validators, hoveredFromTable }: ValidatorWor
             <style>{`
               @keyframes flashRed {
                 0% { fill: #a3e635; }
-                20% { fill: #fca5a5; }
-                40% { fill: #ef4444; }
-                60% { fill: #fca5a5; }
-                80% { fill: #ef4444; }
+                10% { fill: #fca5a5; }
+                25% { fill: #dc2626; }
+                50% { fill: #dc2626; }
+                75% { fill: #fca5a5; }
+                90% { fill: #ef4444; }
                 100% { fill: #a3e635; }
               }
               @keyframes pulseRedGlow {
-                0%, 100% { opacity: 0.4; }
+                0% { opacity: 0.4; }
+                25% { opacity: 0.9; }
                 50% { opacity: 0.9; }
+                75% { opacity: 0.9; }
+                100% { opacity: 0.4; }
               }
               .flash-red-validator {
-                animation: flashRed 1s ease-in-out;
+                animation: flashRed 3s ease-in-out;
               }
               .flash-red-glow {
-                animation: pulseRedGlow 1s ease-in-out;
+                animation: pulseRedGlow 3s ease-in-out;
               }
             `}</style>
             
