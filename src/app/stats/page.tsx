@@ -92,9 +92,6 @@ export default function RitualAnalyticsPage() {
                   // Track commitment block for settlement time calculation
                   if (tx.originTx) {
                     commitmentBlocks.set(tx.originTx, block.number)
-                    console.log(`📝 Tracked commitment: originTx=${tx.originTx.slice(0, 10)}... at block ${block.number}`)
-                  } else {
-                    console.warn(`⚠️ Commitment tx missing originTx:`, tx)
                   }
                   break
                 case 0x12: 
@@ -105,11 +102,6 @@ export default function RitualAnalyticsPage() {
                     const commitBlock = commitmentBlocks.get(tx.originTx)!
                     const settlementTime = block.number - commitBlock
                     settlementTimes.push(settlementTime)
-                    console.log(`✅ Settlement time calculated: ${settlementTime} blocks (commit: ${commitBlock}, settlement: ${block.number})`)
-                  } else if (tx.originTx) {
-                    console.warn(`⚠️ Settlement tx has originTx but no matching commitment: ${tx.originTx.slice(0, 10)}...`)
-                  } else {
-                    console.warn(`⚠️ Settlement tx missing originTx:`, tx)
                   }
                   break
               default: legacyTxs++; break
@@ -123,9 +115,6 @@ export default function RitualAnalyticsPage() {
     const avgSettlementTime = settlementTimes.length > 0
       ? settlementTimes.reduce((sum, time) => sum + time, 0) / settlementTimes.length
       : 2.5 // Fallback to estimate if no data
-    
-    console.log(`📊 [ProcessRitualAnalytics] Settlement times:`, settlementTimes)
-    console.log(`📊 [ProcessRitualAnalytics] Average settlement time: ${avgSettlementTime.toFixed(1)} blocks (from ${settlementTimes.length} settlements)`)
 
     const analyticsData: RitualAnalytics = {
       totalTransactions,
@@ -312,9 +301,6 @@ export default function RitualAnalyticsPage() {
                   if (tx.originTx) {
                     const blockNum = parseInt(block.number, 16)
                     commitmentBlocks.set(tx.originTx, blockNum)
-                    console.log(`📝 [LoadAnalytics] Tracked commitment: originTx=${tx.originTx.slice(0, 10)}... at block ${blockNum}`)
-                  } else {
-                    console.warn(`⚠️ [LoadAnalytics] Commitment tx missing originTx:`, tx)
                   }
                   break
                 case 0x12: 
@@ -326,11 +312,6 @@ export default function RitualAnalyticsPage() {
                     const blockNum = parseInt(block.number, 16)
                     const settlementTime = blockNum - commitBlock
                     settlementTimes.push(settlementTime)
-                    console.log(`✅ [LoadAnalytics] Settlement time: ${settlementTime} blocks (commit: ${commitBlock}, settlement: ${blockNum})`)
-                  } else if (tx.originTx) {
-                    console.warn(`⚠️ [LoadAnalytics] Settlement has originTx but no matching commitment: ${tx.originTx.slice(0, 10)}...`)
-                  } else {
-                    console.warn(`⚠️ [LoadAnalytics] Settlement tx missing originTx:`, tx)
                   }
                   break
                 default: legacyTxs++; break
@@ -383,9 +364,6 @@ export default function RitualAnalyticsPage() {
       const avgSettlementTime = settlementTimes.length > 0
         ? settlementTimes.reduce((sum, time) => sum + time, 0) / settlementTimes.length
         : 2.5 // Fallback to estimate if no data
-      
-      console.log(`📊 [LoadAnalytics] Settlement times:`, settlementTimes)
-      console.log(`📊 [LoadAnalytics] Average settlement time: ${avgSettlementTime.toFixed(1)} blocks (from ${settlementTimes.length} settlements)`)
       
       // Store blocks for real-time updates
       blocksDataRef.current = recentBlocks
