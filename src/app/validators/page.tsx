@@ -26,6 +26,9 @@ interface BlockCache {
   timestamp: number
 }
 
+type SortField = 'rank' | 'address' | 'ip' | 'blocksProposed' | 'activityShare' | 'lastBlock' | 'healthStatus'
+type SortDirection = 'asc' | 'desc'
+
 export default function ValidatorsPage() {
   useParticleBackground()
   const [validators, setValidators] = useState<ValidatorStats[]>([])
@@ -36,6 +39,8 @@ export default function ValidatorsPage() {
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
   const [isMounted, setIsMounted] = useState(false)
   const [hoveredValidator, setHoveredValidator] = useState<string | null>(null)
+  const [sortField, setSortField] = useState<SortField>('rank')
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
   
   // Cache of all blocks for efficient updates (continuous expanding window)
   const blockCache = useRef<BlockCache[]>([])
@@ -344,6 +349,82 @@ export default function ValidatorsPage() {
     return `${Math.floor(diff / 86400)}d ago`
   }
 
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortField(field)
+      setSortDirection('asc')
+    }
+  }
+
+  const getSortedValidators = () => {
+    const sorted = [...validators]
+    const manager = getRealtimeManager()
+    const peers = manager?.getCachedValidatorPeers() || []
+
+    sorted.sort((a, b) => {
+      let comparison = 0
+
+      switch (sortField) {
+        case 'rank':
+          comparison = validators.indexOf(a) - validators.indexOf(b)
+          break
+        case 'address':
+          comparison = a.address.localeCompare(b.address)
+          break
+        case 'ip':
+          const peerA = peers.find(p => p.coinbase_address?.toLowerCase() === a.address.toLowerCase())
+          const peerB = peers.find(p => p.coinbase_address?.toLowerCase() === b.address.toLowerCase())
+          const ipA = peerA?.ip_address?.split(':')[0] || ''
+          const ipB = peerB?.ip_address?.split(':')[0] || ''
+          comparison = ipA.localeCompare(ipB)
+          break
+        case 'blocksProposed':
+          comparison = a.blocksProposed - b.blocksProposed
+          break
+        case 'activityShare':
+          comparison = a.percentage - b.percentage
+          break
+        case 'lastBlock':
+          comparison = a.lastBlockNumber - b.lastBlockNumber
+          break
+        case 'healthStatus':
+          const statusOrder = { active: 0, warning: 1, inactive: 2 }
+          comparison = statusOrder[a.healthStatus] - statusOrder[b.healthStatus]
+          break
+      }
+
+      return sortDirection === 'asc' ? comparison : -comparison
+    })
+
+    return sorted
+  }
+
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sortField !== field) {
+      return (
+        <svg className="w-4 h-4 ml-1 text-lime-300/30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+        </svg>
+      )
+    }
+    
+    if (sortDirection === 'asc') {
+      return (
+        <svg className="w-4 h-4 ml-1 text-lime-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+        </svg>
+      )
+    }
+    
+    return (
+      <svg className="w-4 h-4 ml-1 text-lime-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+      </svg>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-black text-white">
       <Navigation currentPage="validators" />
@@ -426,31 +507,75 @@ export default function ValidatorsPage() {
               <table className="w-full">
                 <thead className="bg-lime-500/10 border-b border-lime-500/20">
                   <tr>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-lime-300 uppercase tracking-wider">
-                      Rank
+                    <th 
+                      className="px-6 py-4 text-left text-xs font-medium text-lime-300 uppercase tracking-wider cursor-pointer hover:bg-lime-500/5 transition-colors select-none"
+                      onClick={() => handleSort('rank')}
+                    >
+                      <div className="flex items-center">
+                        Rank
+                        <SortIcon field="rank" />
+                      </div>
                     </th>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-lime-300 uppercase tracking-wider">
-                      Validator Address
+                    <th 
+                      className="px-6 py-4 text-left text-xs font-medium text-lime-300 uppercase tracking-wider cursor-pointer hover:bg-lime-500/5 transition-colors select-none"
+                      onClick={() => handleSort('address')}
+                    >
+                      <div className="flex items-center">
+                        Validator Address
+                        <SortIcon field="address" />
+                      </div>
                     </th>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-lime-300 uppercase tracking-wider">
-                      IP Address
+                    <th 
+                      className="px-6 py-4 text-left text-xs font-medium text-lime-300 uppercase tracking-wider cursor-pointer hover:bg-lime-500/5 transition-colors select-none"
+                      onClick={() => handleSort('ip')}
+                    >
+                      <div className="flex items-center">
+                        IP Address
+                        <SortIcon field="ip" />
+                      </div>
                     </th>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-lime-300 uppercase tracking-wider">
-                      Blocks Proposed
+                    <th 
+                      className="px-6 py-4 text-left text-xs font-medium text-lime-300 uppercase tracking-wider cursor-pointer hover:bg-lime-500/5 transition-colors select-none"
+                      onClick={() => handleSort('blocksProposed')}
+                    >
+                      <div className="flex items-center">
+                        Blocks Proposed
+                        <SortIcon field="blocksProposed" />
+                      </div>
                     </th>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-lime-300 uppercase tracking-wider">
-                      Activity Share
+                    <th 
+                      className="px-6 py-4 text-left text-xs font-medium text-lime-300 uppercase tracking-wider cursor-pointer hover:bg-lime-500/5 transition-colors select-none"
+                      onClick={() => handleSort('activityShare')}
+                    >
+                      <div className="flex items-center">
+                        Activity Share
+                        <SortIcon field="activityShare" />
+                      </div>
                     </th>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-lime-300 uppercase tracking-wider">
-                      Last Block
+                    <th 
+                      className="px-6 py-4 text-left text-xs font-medium text-lime-300 uppercase tracking-wider cursor-pointer hover:bg-lime-500/5 transition-colors select-none"
+                      onClick={() => handleSort('lastBlock')}
+                    >
+                      <div className="flex items-center">
+                        Last Block
+                        <SortIcon field="lastBlock" />
+                      </div>
                     </th>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-lime-300 uppercase tracking-wider">
-                      Health Status
+                    <th 
+                      className="px-6 py-4 text-left text-xs font-medium text-lime-300 uppercase tracking-wider cursor-pointer hover:bg-lime-500/5 transition-colors select-none"
+                      onClick={() => handleSort('healthStatus')}
+                    >
+                      <div className="flex items-center">
+                        Health Status
+                        <SortIcon field="healthStatus" />
+                      </div>
                     </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-lime-500/10">
-                  {validators.map((validator, index) => (
+                  {getSortedValidators().map((validator, index) => {
+                    const originalRank = validators.findIndex(v => v.address === validator.address) + 1
+                    return (
                     <tr 
                       key={validator.address}
                       className="hover:bg-lime-500/5 transition-colors duration-150"
@@ -459,7 +584,7 @@ export default function ValidatorsPage() {
                     >
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm font-medium text-lime-300">
-                          #{index + 1}
+                          #{sortField === 'rank' ? index + 1 : originalRank}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -520,7 +645,7 @@ export default function ValidatorsPage() {
                         </span>
                       </td>
                     </tr>
-                  ))}
+                  )})}
                 </tbody>
               </table>
             </div>
