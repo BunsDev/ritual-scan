@@ -21,6 +21,7 @@ interface ValidatorWorldMapProps {
     blocksProposed: number
     percentage: number
   }>
+  hoveredFromTable?: string | null
 }
 
 // Convert lat/lon to SVG coordinates (Mercator projection simplified)
@@ -147,7 +148,7 @@ const validatorRegions = [
   { city: 'Mumbai', country: 'India', lat: 19.0760, lon: 72.8777 },
 ]
 
-export function ValidatorWorldMap({ validators }: ValidatorWorldMapProps) {
+export function ValidatorWorldMap({ validators, hoveredFromTable }: ValidatorWorldMapProps) {
   const [validatorLocations, setValidatorLocations] = useState<ValidatorLocation[]>([])
   const [hoveredValidator, setHoveredValidator] = useState<ValidatorLocation | null>(null)
   const [latestBlockMiner, setLatestBlockMiner] = useState<string | null>(null)
@@ -426,26 +427,29 @@ export function ValidatorWorldMap({ validators }: ValidatorWorldMapProps) {
               const percentage = validator.percentage || 0
               const size = Math.max(3, Math.min(12, 3 + Math.log(1 + percentage) * 1.5))
               
+              const isActive = validator.address.toLowerCase() === latestBlockMiner
+              const isHoveredFromTable = validator.address.toLowerCase() === hoveredFromTable?.toLowerCase()
+              
               return (
                 <g key={validator.address}>
-                  {/* Very subtle red glow (barely visible) */}
+                  {/* Base glow - green for normal, red for active, blue for table hover */}
                   <circle
                     cx={pos.x}
                     cy={pos.y}
-                    r={size * 1.5}
-                    fill="url(#red-glow)"
-                    opacity="0.15"
+                    r={size * 1.8}
+                    fill={isHoveredFromTable ? "url(#blue-glow)" : isActive ? "url(#red-glow)" : "url(#green-glow)"}
+                    opacity={isActive ? "0.5" : "0.2"}
                   >
                     <animate
                       attributeName="opacity"
-                      values="0.1;0.2;0.1"
-                      dur="4s"
+                      values={isActive ? "0.3;0.6;0.3" : "0.15;0.25;0.15"}
+                      dur={isActive ? "2s" : "4s"}
                       repeatCount="indefinite"
                     />
                   </circle>
                   
-                  {/* Active validator intense glow (when minted latest block) */}
-                  {validator.address.toLowerCase() === latestBlockMiner && (
+                  {/* Intense flash for active validator */}
+                  {isActive && (
                     <circle
                       cx={pos.x}
                       cy={pos.y}
@@ -456,9 +460,34 @@ export function ValidatorWorldMap({ validators }: ValidatorWorldMapProps) {
                     />
                   )}
                   
-                  {/* Define red glow gradients (shared) */}
+                  {/* Blue highlight ring for table hover */}
+                  {isHoveredFromTable && (
+                    <circle
+                      cx={pos.x}
+                      cy={pos.y}
+                      r={size * 2.5}
+                      fill="none"
+                      stroke="#3b82f6"
+                      strokeWidth="2"
+                      opacity="0.8"
+                    >
+                      <animate
+                        attributeName="r"
+                        values={`${size * 2};${size * 3};${size * 2}`}
+                        dur="1.5s"
+                        repeatCount="indefinite"
+                      />
+                    </circle>
+                  )}
+                  
+                  {/* Define glow gradients (shared, created once) */}
                   {index === 0 && (
                     <defs>
+                      <radialGradient id="green-glow">
+                        <stop offset="0%" stopColor="#84cc16" stopOpacity="0.6" />
+                        <stop offset="50%" stopColor="#65a30d" stopOpacity="0.3" />
+                        <stop offset="100%" stopColor="#3f6212" stopOpacity="0" />
+                      </radialGradient>
                       <radialGradient id="red-glow">
                         <stop offset="0%" stopColor="#ef4444" stopOpacity="0.9" />
                         <stop offset="50%" stopColor="#dc2626" stopOpacity="0.5" />
@@ -469,6 +498,11 @@ export function ValidatorWorldMap({ validators }: ValidatorWorldMapProps) {
                         <stop offset="50%" stopColor="#ef4444" stopOpacity="0.8" />
                         <stop offset="100%" stopColor="#dc2626" stopOpacity="0" />
                       </radialGradient>
+                      <radialGradient id="blue-glow">
+                        <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.8" />
+                        <stop offset="50%" stopColor="#2563eb" stopOpacity="0.6" />
+                        <stop offset="100%" stopColor="#1d4ed8" stopOpacity="0" />
+                      </radialGradient>
                     </defs>
                   )}
                   
@@ -477,16 +511,16 @@ export function ValidatorWorldMap({ validators }: ValidatorWorldMapProps) {
                     cx={pos.x}
                     cy={pos.y}
                     r={size}
-                    fill={validator.address.toLowerCase() === latestBlockMiner ? "#fca5a5" : "#a3e635"}
+                    fill={isHoveredFromTable ? "#60a5fa" : isActive ? "#fca5a5" : "#a3e635"}
                     stroke="#ffffff"
-                    strokeWidth="1.5"
+                    strokeWidth={isHoveredFromTable ? "2.5" : "1.5"}
                     cursor="pointer"
                     onMouseEnter={() => setHoveredValidator(validator)}
                     onMouseLeave={() => setHoveredValidator(null)}
-                    className={validator.address.toLowerCase() === latestBlockMiner ? 'flash-red-validator' : ''}
+                    className={isActive ? 'flash-red-validator' : ''}
                     style={{ 
-                      transition: 'fill 0.3s ease-in-out',
-                      filter: validator.address.toLowerCase() === latestBlockMiner ? 'drop-shadow(0 0 6px #ef4444)' : 'none'
+                      transition: 'fill 0.3s ease-in-out, stroke-width 0.2s ease-in-out',
+                      filter: isActive ? 'drop-shadow(0 0 6px #ef4444)' : isHoveredFromTable ? 'drop-shadow(0 0 8px #3b82f6)' : 'none'
                     }}
                   />
                   

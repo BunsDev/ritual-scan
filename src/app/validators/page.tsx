@@ -35,6 +35,7 @@ export default function ValidatorsPage() {
   const [blockRange, setBlockRange] = useState({ start: 0, end: 0 })
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
   const [isMounted, setIsMounted] = useState(false)
+  const [hoveredValidator, setHoveredValidator] = useState<string | null>(null)
   
   // Cache of all blocks for efficient updates (continuous expanding window)
   const blockCache = useRef<BlockCache[]>([])
@@ -415,7 +416,7 @@ export default function ValidatorsPage() {
 
         {/* World Map */}
         {!loading && !error && validators.length > 0 && (
-          <ValidatorWorldMap validators={validators} />
+          <ValidatorWorldMap validators={validators} hoveredFromTable={hoveredValidator} />
         )}
 
         {/* Validators Table */}
@@ -453,6 +454,8 @@ export default function ValidatorsPage() {
                     <tr 
                       key={validator.address}
                       className="hover:bg-lime-500/5 transition-colors duration-150"
+                      onMouseEnter={() => setHoveredValidator(validator.address)}
+                      onMouseLeave={() => setHoveredValidator(null)}
                     >
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm font-medium text-lime-300">
