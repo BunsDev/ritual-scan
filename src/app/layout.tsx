@@ -6,7 +6,6 @@ import { Toaster } from "@/components/ui/sonner";
 import { BackgroundAudio } from "@/components/BackgroundAudio";
 import { ParticleToggleSimple } from "@/components/ParticleToggleSimple";
 import { WagmiProviderWrapper } from "@/components/WagmiProviderWrapper";
-import { WalletButtonFixed } from "@/components/WalletButtonFixed";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -84,7 +83,6 @@ export default function RootLayout({
         <WagmiProviderWrapper>
           <Providers>
             {children}
-            <WalletButtonFixed />
             <BackgroundAudio />
             <ParticleToggleSimple />
             <Toaster />
