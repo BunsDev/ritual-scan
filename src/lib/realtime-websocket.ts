@@ -605,53 +605,116 @@ class RealtimeWebSocketManager {
     }
   }
 
-  // Enrich peer list with GeoIP data (OPTIMIZED: uses batch API)
+  // Enrich peer list with GeoIP data (OPTIMIZED: uses batch API + caching)
   private async enrichPeersWithGeoIP() {
     if (this.validatorPeers.length === 0) return
     
     try {
-      // Prepare batch request (strip ports from IPs)
-      const batchQuery = this.validatorPeers.map(peer => {
-        const ipOnly = peer.ip_address?.split(':')[0] || peer.ip_address
-        return {
-          query: ipOnly,
-          fields: 'status,country,city,lat,lon'
-        }
-      })
+      // Check localStorage cache for GeoIP data (24 hour TTL)
+      const GEOIP_CACHE_KEY = 'ritual-scan-geoip-cache'
+      const GEOIP_CACHE_TTL = 24 * 60 * 60 * 1000 // 24 hours
       
-      // Single batch request for ALL IPs (much faster!)
-      const geoResponse = await fetch('http://ip-api.com/batch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(batchQuery),
-        signal: AbortSignal.timeout(5000)
-      })
-      
-      if (geoResponse.ok) {
-        const geoResults = await geoResponse.json()
-        
-        // Match results back to peers
-        const enrichedPeers = this.validatorPeers.map((peer, index) => {
-          const geoData = geoResults[index]
-          if (geoData?.status === 'success') {
-            return {
-              ...peer,
-              lat: geoData.lat,
-              lon: geoData.lon,
-              city: geoData.city,
-              country: geoData.country,
-              isReal: true
-            }
+      let geoIPCache: Record<string, any> = {}
+      try {
+        const cached = localStorage.getItem(GEOIP_CACHE_KEY)
+        if (cached) {
+          const parsed = JSON.parse(cached)
+          // Check if cache is still valid
+          if (parsed.timestamp && Date.now() - parsed.timestamp < GEOIP_CACHE_TTL) {
+            geoIPCache = parsed.data || {}
+            this.log(`📦 [${this.connectionId}] Loaded GeoIP cache with ${Object.keys(geoIPCache).length} entries`)
           }
-          return { ...peer, isReal: false }
+        }
+      } catch (e) {
+        // Invalid cache, ignore
+      }
+      
+      // Check which IPs need fetching (not in cache)
+      const ipsToFetch: string[] = []
+      const ipMap: Map<string, any> = new Map()
+      
+      this.validatorPeers.forEach(peer => {
+        const ipOnly = peer.ip_address?.split(':')[0] || peer.ip_address
+        if (ipOnly && !geoIPCache[ipOnly]) {
+          ipsToFetch.push(ipOnly)
+        }
+        ipMap.set(peer.ip_address, peer)
+      })
+      
+      // If we need to fetch new IPs, do batch request
+      if (ipsToFetch.length > 0) {
+        this.log(`🌍 [${this.connectionId}] Fetching GeoIP for ${ipsToFetch.length} new IPs (${Object.keys(geoIPCache).length} cached)`)
+        
+        const batchQuery = ipsToFetch.map(ip => ({
+          query: ip,
+          fields: 'status,country,city,lat,lon'
+        }))
+        
+        const geoResponse = await fetch('http://ip-api.com/batch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(batchQuery),
+          signal: AbortSignal.timeout(5000)
         })
         
-        this.validatorPeers = enrichedPeers
-        this.logImportant(`🌍 [${this.connectionId}] Enriched ${enrichedPeers.filter(p => p.isReal).length}/${enrichedPeers.length} peers with GeoIP data (batch request)`)
-        
-        // Save to localStorage immediately
-        this.saveCacheToStorage()
+        if (geoResponse.ok) {
+          const geoResults = await geoResponse.json()
+          
+          // Update cache with new results
+          geoResults.forEach((result: any, index: number) => {
+            if (result?.status === 'success') {
+              geoIPCache[ipsToFetch[index]] = {
+                lat: result.lat,
+                lon: result.lon,
+                city: result.city,
+                country: result.country
+              }
+            }
+          })
+          
+          // Save updated cache
+          localStorage.setItem(GEOIP_CACHE_KEY, JSON.stringify({
+            timestamp: Date.now(),
+            data: geoIPCache
+          }))
+        }
+      } else {
+        this.log(`✅ [${this.connectionId}] All ${this.validatorPeers.length} IPs already in cache, skipping batch request`)
       }
+      
+      // Enrich peers with cached + fetched data
+      const enrichedPeers = this.validatorPeers.map(peer => {
+        const ipOnly = peer.ip_address?.split(':')[0] || peer.ip_address
+        const geoData = geoIPCache[ipOnly]
+        
+        if (geoData) {
+          return {
+            ...peer,
+            lat: geoData.lat,
+            lon: geoData.lon,
+            city: geoData.city,
+            country: geoData.country,
+            isReal: true
+          }
+        }
+        return { ...peer, isReal: false }
+      })
+      
+      this.validatorPeers = enrichedPeers
+      const realCount = enrichedPeers.filter(p => p.isReal).length
+      this.logImportant(`🌍 [${this.connectionId}] Enriched ${realCount}/${enrichedPeers.length} peers with GeoIP data${ipsToFetch.length > 0 ? ` (fetched ${ipsToFetch.length} new)` : ' (all from cache)'}`)
+      
+      // Save to localStorage
+      this.saveCacheToStorage()
+      
+      // Notify subscribers with enriched data
+      const validatorUpdate: RealtimeUpdate = {
+        type: 'validatorPeersUpdate' as any,
+        data: this.validatorPeers,
+        timestamp: Date.now()
+      }
+      this.notifyCallbacks(validatorUpdate)
+      
     } catch (error) {
       console.error(`❌ [${this.connectionId}] Batch GeoIP enrichment failed:`, error)
       // Keep peers without location data

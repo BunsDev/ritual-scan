@@ -153,33 +153,17 @@ export function ValidatorWorldMap({ validators }: ValidatorWorldMapProps) {
   return (
     <div className="bg-gradient-to-br from-lime-900/10 to-black border border-lime-500/20 rounded-lg p-6 mb-8">
       <div className="mb-4">
-        <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center justify-between">
           <div>
             <h3 className="text-lg font-semibold text-white">Validator Geospatial Distribution</h3>
             <p className="text-sm text-lime-300">
-              {validators.length} active validators across {validatorRegions.length} regions
+              {validators.length} active validators • Real-time updates
             </p>
           </div>
           <div className="text-xs text-lime-400 bg-lime-900/20 px-3 py-1 rounded-full border border-lime-500/30">
             {validators.length} nodes • Full mesh topology
           </div>
         </div>
-        {dataSource === 'placeholder' ? (
-          <div className="p-3 bg-yellow-900/20 border border-yellow-500/30 rounded-md">
-            <p className="text-xs text-yellow-300">
-              <span className="font-semibold">⚠️ PLACEHOLDER DATA:</span> Geographic locations are simulated. 
-              Real validator locations are being fetched from Summit node (port 3030) and will appear once available.
-              Data updates automatically every 1-5 minutes.
-            </p>
-          </div>
-        ) : (
-          <div className="p-3 bg-green-900/20 border border-green-500/30 rounded-md">
-            <p className="text-xs text-green-300">
-              <span className="font-semibold">✅ REAL GEOIP DATA:</span> Showing {validatorLocations.filter(v => v.isReal).length} validators with actual geographic locations 
-              from Summit node peer list (port 3030) + GeoIP lookup. Updates every 1-5 minutes.
-            </p>
-          </div>
-        )}
       </div>
       
       <div className="relative bg-black/60 rounded-lg border border-lime-500/10 overflow-hidden">
