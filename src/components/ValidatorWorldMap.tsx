@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { getRealtimeManager } from '@/lib/realtime-websocket'
 
 interface ValidatorLocation {
@@ -33,6 +33,8 @@ function latLonToSVG(lat: number, lon: number, width: number, height: number) {
 }
 
 // Detect and resolve overlapping validator positions
+// Performance: O(n²) for overlap detection, but memoized so only runs when validator set changes
+// With typical n < 100 validators, this is negligible (~10ms)
 function resolveOverlaps(
   validators: Array<{ address: string; lat: number; lon: number; percentage: number }>,
   width: number,
@@ -41,14 +43,14 @@ function resolveOverlaps(
 ): Map<string, { x: number; y: number }> {
   const positions = new Map<string, { x: number; y: number }>()
   
-  // First pass: calculate raw positions
+  // First pass: calculate raw positions - O(n)
   const rawPositions = validators.map(v => ({
     address: v.address,
     pos: latLonToSVG(v.lat, v.lon, width, height),
     percentage: v.percentage
   }))
   
-  // Second pass: detect overlaps and create groups
+  // Second pass: detect overlaps and create groups - O(n²)
   const processed = new Set<string>()
   const groups: Array<typeof rawPositions> = []
   
@@ -75,14 +77,15 @@ function resolveOverlaps(
     groups.push(group)
   })
   
-  // Third pass: arrange each group in a radial pattern
+  // Third pass: arrange each group in a radial pattern - O(n)
+  // This creates a "flower" pattern for overlapping validators
   groups.forEach(group => {
     if (group.length === 1) {
       // No overlap, use original position
       positions.set(group[0].address, group[0].pos)
     } else {
-      // Multiple validators - arrange in circle
-      // Sort by percentage (largest in center)
+      // Multiple validators in same location - arrange in circle
+      // Sort by percentage (largest validator in center)
       group.sort((a, b) => b.percentage - a.percentage)
       
       // Calculate centroid
@@ -268,17 +271,20 @@ export function ValidatorWorldMap({ validators }: ValidatorWorldMapProps) {
   const mapWidth = 1000
   const mapHeight = 500
 
-  // Calculate adjusted positions to resolve overlaps
-  const adjustedPositions = resolveOverlaps(
-    validatorLocations.map(v => ({
-      address: v.address,
-      lat: v.lat,
-      lon: v.lon,
-      percentage: v.percentage
-    })),
-    mapWidth,
-    mapHeight
-  )
+  // Calculate adjusted positions to resolve overlaps (MEMOIZED - only recomputes when validators change)
+  const adjustedPositions = useMemo(() => {
+    console.log(`🔄 [ValidatorMap] Computing overlap resolution for ${validatorLocations.length} validators`)
+    return resolveOverlaps(
+      validatorLocations.map(v => ({
+        address: v.address,
+        lat: v.lat,
+        lon: v.lon,
+        percentage: v.percentage
+      })),
+      mapWidth,
+      mapHeight
+    )
+  }, [validatorLocations])
 
   return (
     <div className="bg-gradient-to-br from-lime-900/10 to-black border border-lime-500/20 rounded-lg p-6 mb-8">
