@@ -24,7 +24,7 @@ export function PasswordProtection({ children }: PasswordProtectionProps) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     
-    if (password === 'notthelastlayer1') {
+    if (password === 'notthelastlayer1~') {
       setIsAuthenticated(true)
       localStorage.setItem('ritual-scan-auth', 'authenticated')
       setError('')

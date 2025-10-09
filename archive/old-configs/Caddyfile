@@ -1,0 +1,39 @@
+localhost:443 {
+    tls internal
+    
+    # WebSocket proxy directly to RPC node (bypasses Next.js)
+    # Caddy handles WebSocket upgrade, so use http:// scheme for upstream
+    @rpc_websocket {
+        path /rpc-ws
+    }
+    reverse_proxy @rpc_websocket 35.196.101.134:8546 {
+        header_up Host {upstream_hostport}
+        header_up Upgrade {http.request.header.Upgrade}
+        header_up Connection {http.request.header.Connection}
+    }
+    
+    # All other traffic (including app WebSockets) to Next.js
+    @app_websocket {
+        header Connection *Upgrade*
+        header Upgrade websocket
+        not path /rpc-ws
+    }
+    reverse_proxy @app_websocket localhost:5051
+    
+    # Regular HTTP traffic to Next.js
+    reverse_proxy localhost:5051
+    
+    # Security headers for Next.js
+    header {
+        X-Frame-Options SAMEORIGIN
+        X-Content-Type-Options nosniff
+        X-XSS-Protection "1; mode=block"
+    }
+}
+
+# Also support plain HTTP for testing
+localhost:80 {
+    redir https://localhost{uri} permanent
+}
+
+

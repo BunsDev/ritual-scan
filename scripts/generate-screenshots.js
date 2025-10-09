@@ -2,27 +2,82 @@ const puppeteer = require('puppeteer');
 const path = require('path');
 const fs = require('fs').promises;
 
-const BASE_URL = 'http://localhost:4005';
+const BASE_URL = process.env.SCREENSHOT_URL || 'https://ding.fish';
 const SCREENSHOT_DIR = path.join(__dirname, '..', 'docs', 'screenshots');
+const PASSWORD = 'notthelastlayer1~';
 
 const pages = [
   {
-    name: 'tx-async-settlement-debug',
-    url: '/tx/0xb0b880a40c40c4c03251560b844f453c07d948b784feadfc138809f794215549',
-    title: 'Async Settlement Transaction (DEBUG)',
-    description: 'Settlement transaction with debug logging to understand data flow'
+    name: 'homepage',
+    url: '/',
+    title: 'Homepage Dashboard',
+    description: 'Real-time network overview with latest blocks, transactions, and live stats',
+    waitTime: 30000
   },
   {
-    name: 'tx-eip1559',
-    url: '/tx/0x09bbd07fa05e52fb676d9d903608cfbed246a29833511b584d0d013588c6bd0e',
-    title: 'EIP-1559 Transaction (Type 0x2)',
-    description: 'Modern EIP-1559 transaction with priority fee and base fee mechanism'
+    name: 'charts',
+    url: '/charts',
+    title: 'Charts Dashboard',
+    description: 'Visual analytics with gas usage, transaction counts, and performance metrics',
+    waitTime: 60000
   },
   {
-    name: 'tx-scheduled',
-    url: '/tx/0xcfe26ebf97dd007756e7e44fc4880c1502134961813d35a939d6e9d786eabcde',
-    title: 'Scheduled Transaction (Type 0x10)',
-    description: 'Ritual Chain scheduled transaction with Call ID tracking and cron-like execution'
+    name: 'stats',
+    url: '/stats',
+    title: 'Ritual Chain Stats',
+    description: 'Async adoption metrics, protocol fees, and transaction type distribution',
+    waitTime: 60000
+  },
+  {
+    name: 'blocks',
+    url: '/blocks',
+    title: 'Block Explorer',
+    description: 'Real-time block list with live updates via WebSocket',
+    waitTime: 30000
+  },
+  {
+    name: 'validators',
+    url: '/validators',
+    title: 'Validator Network Map',
+    description: 'Geographic visualization of validator network with activity metrics',
+    waitTime: 30000
+  },
+  {
+    name: 'leaderboard',
+    url: '/leaderboard',
+    title: 'Network Leaderboard',
+    description: 'Top validators and network participants ranked by activity',
+    waitTime: 30000
+  },
+  {
+    name: 'mempool',
+    url: '/mempool',
+    title: 'Live Mempool Monitor',
+    description: 'Real-time pending transactions and scheduled jobs',
+    waitTime: 30000
+  },
+  {
+    name: 'mempool-scheduled',
+    url: '/mempool',
+    title: 'Scheduled Transactions',
+    description: 'Scheduled transactions waiting to execute',
+    waitTime: 30000,
+    clickTab: 'Scheduled'
+  },
+  {
+    name: 'mempool-async',
+    url: '/mempool',
+    title: 'Async Transactions',
+    description: 'Async commitment and settlement transactions',
+    waitTime: 30000,
+    clickTab: 'Async'
+  },
+  {
+    name: 'settings',
+    url: '/settings',
+    title: 'RPC Configuration',
+    description: 'User-configurable RPC endpoints with connection testing',
+    waitTime: 30000
   }
 ];
 
@@ -37,12 +92,12 @@ async function ensureDirectoryExists(dir) {
 }
 
 async function generateScreenshots() {
-  console.log('🔄 Starting screenshot generation...');
+  console.log(`🔄 Starting screenshot generation from ${BASE_URL}...`);
   
   await ensureDirectoryExists(SCREENSHOT_DIR);
 
   const browser = await puppeteer.launch({
-    headless: true,
+    headless: 'new',
     defaultViewport: {
       width: 1920,
       height: 1080
@@ -54,59 +109,106 @@ async function generateScreenshots() {
       '--disable-accelerated-2d-canvas',
       '--no-first-run',
       '--no-zygote',
-      '--disable-gpu'
+      '--single-process'
     ]
   });
 
   const page = await browser.newPage();
   
-  // Set user agent to avoid detection
+  // Set user agent
   await page.setUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
   
+  // Handle password authentication if needed
+  let authenticated = false;
+  
   let successCount = 0;
+  let errorCount = 0;
 
   for (const pageInfo of pages) {
     try {
       console.log(`📸 Capturing ${pageInfo.name}...`);
       
-      console.log(`📸 Capturing ${pageInfo.name}...`);
-      
-      // Set up console log capture for debug mode
-      if (pageInfo.name.includes('debug')) {
-        page.on('console', msg => {
-          console.log('🌐 BROWSER:', msg.text());
-        });
-      }
-      
-      // Navigate to the page
+      // Navigate to the page with minimal wait first
       await page.goto(`${BASE_URL}${pageInfo.url}`, {
-        waitUntil: 'networkidle0',
+        waitUntil: 'domcontentloaded',
         timeout: 30000
       });
 
-      // Wait for dynamic content to load
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      // Handle password prompt on first page load IMMEDIATELY
+      if (!authenticated) {
+        console.log(`   Checking for password prompt...`);
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        const passwordInput = await page.$('input[type="password"]');
+        if (passwordInput) {
+          console.log(`   Entering password...`);
+          await page.type('input[type="password"]', PASSWORD);
+          await page.keyboard.press('Enter');
+          console.log(`   Waiting for authentication...`);
+          await new Promise(resolve => setTimeout(resolve, 3000));
+          authenticated = true;
+          console.log(`   ✅ Authenticated successfully`);
+        }
+      }
+      
+      // Now wait for network to settle after authentication
+      try {
+        await page.waitForNetworkIdle({ timeout: 10000, idleTime: 500 });
+      } catch (e) {
+        console.log(`   ⚠️ Network not idle, continuing anyway`);
+      }
 
-      // Try to wait for specific elements that indicate the page is fully loaded
+      // Click tab if specified (for mempool tabs)
+      if (pageInfo.clickTab) {
+        console.log(`   Clicking ${pageInfo.clickTab} tab...`);
+        try {
+          await page.waitForSelector('button', { timeout: 5000 });
+          const buttons = await page.$$('button');
+          for (const button of buttons) {
+            const text = await page.evaluate(el => el.textContent, button);
+            if (text.includes(pageInfo.clickTab)) {
+              await button.click();
+              await new Promise(resolve => setTimeout(resolve, 2000));
+              break;
+            }
+          }
+        } catch (tabError) {
+          console.log(`⚠️ Could not find ${pageInfo.clickTab} tab`);
+        }
+      }
+
+      // Wait for content to load based on page-specific wait time
+      const waitSeconds = pageInfo.waitTime / 1000;
+      console.log(`   Waiting ${waitSeconds} seconds for content to load...`);
+      await new Promise(resolve => setTimeout(resolve, pageInfo.waitTime));
+
+      // Wait for content based on page type
       try {
         if (pageInfo.name === 'homepage') {
-          await page.waitForSelector('[data-testid="latest-blocks"], .text-white', { timeout: 5000 });
-        } else if (pageInfo.name === 'mempool') {
-          await page.waitForSelector('.animate-pulse, .text-lime-400', { timeout: 5000 });
-        } else if (pageInfo.name === 'settings') {
-          await page.waitForSelector('input, .bg-white\\/5', { timeout: 5000 });
-        } else if (pageInfo.name.startsWith('tx-') || pageInfo.name === 'transaction-detail-example') {
-          await page.waitForSelector('.text-lime-400, .bg-white\\/5, .font-mono', { timeout: 10000 });
-          
-          // For debug mode, capture console logs
-          if (pageInfo.name.includes('debug')) {
-            const logs = await page.evaluate(() => {
-              return window.console.logs || [];
+          await page.waitForSelector('.text-white', { timeout: 5000 });
+        } else if (pageInfo.name === 'charts' || pageInfo.name === 'stats') {
+          await page.waitForSelector('canvas, svg, .plotly', { timeout: 8000 });
+        } else if (pageInfo.name === 'validators') {
+          await page.waitForSelector('canvas, svg', { timeout: 8000 });
+        } else if (pageInfo.name === 'mempool-scheduled' || pageInfo.name === 'mempool-async') {
+          // Wait for transactions to appear, keep checking
+          console.log(`   Waiting for ${pageInfo.clickTab} transactions to appear...`);
+          let attempts = 0;
+          const maxAttempts = 20;
+          while (attempts < maxAttempts) {
+            const hasTransactions = await page.evaluate(() => {
+              const rows = document.querySelectorAll('tbody tr');
+              return rows.length > 0 && !document.body.textContent.includes('No transactions found');
             });
-            console.log('🔍 Browser console logs:', logs);
+            if (hasTransactions) {
+              console.log(`   ✅ Found ${pageInfo.clickTab} transactions!`);
+              break;
+            }
+            await new Promise(resolve => setTimeout(resolve, 3000));
+            attempts++;
           }
-        } else if (pageInfo.name === 'analytics') {
-          await page.waitForSelector('.plotly, canvas, svg', { timeout: 8000 });
+          if (attempts >= maxAttempts) {
+            console.log(`   ⚠️ No ${pageInfo.clickTab} transactions found after waiting`);
+          }
         } else {
           await page.waitForSelector('h1, .text-lime-400', { timeout: 5000 });
         }
@@ -114,12 +216,18 @@ async function generateScreenshots() {
         console.log(`⚠️ Selector wait timeout for ${pageInfo.name}, proceeding with screenshot`);
       }
 
+      // Scroll to top before screenshot
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
       // Take screenshot
       const screenshotPath = path.join(SCREENSHOT_DIR, `${pageInfo.name}.png`);
       await page.screenshot({
         path: screenshotPath,
-        fullPage: true,
-        captureBeyondViewport: true
+        fullPage: false,
+        captureBeyondViewport: false,
+        type: 'png',
+        omitBackground: false
       });
 
       console.log(`✅ Screenshot saved: ${pageInfo.name}.png`);
@@ -134,273 +242,24 @@ async function generateScreenshots() {
   await browser.close();
 
   console.log(`\n📊 Screenshot Generation Complete:`);
-  console.log(`✅ Successful: ${successCount}`);
-  console.log(`❌ Failed: ${errorCount}`);
+  console.log(`✅ Successful: ${successCount}/${pages.length}`);
+  console.log(`❌ Failed: ${errorCount}/${pages.length}`);
   console.log(`📁 Screenshots saved to: ${SCREENSHOT_DIR}`);
 
   return { successCount, errorCount, screenshots: pages };
 }
 
-async function generateReadmeContent(screenshots) {
-  const readmePath = path.join(__dirname, '..', 'README.md');
-  
-  const readmeContent = `# Ritual Explorer - Advanced Blockchain Explorer
-
-![Ritual Explorer](https://img.shields.io/badge/Ritual-Explorer-84cc16?style=for-the-badge&logo=blockchain&logoColor=white)
-![Next.js](https://img.shields.io/badge/Next.js-14-black?style=for-the-badge&logo=next.js)
-![TypeScript](https://img.shields.io/badge/TypeScript-100%25-blue?style=for-the-badge&logo=typescript)
-![Real-time](https://img.shields.io/badge/WebSocket-Real--time-84cc16?style=for-the-badge)
-
-A production-ready, high-performance blockchain explorer built specifically for **Ritual Chain** with advanced features including async transaction visualization, scheduled job monitoring, and real-time WebSocket updates.
-
-## 🌟 Key Features
-
-### 🎯 **Ritual Chain Specific Features**
-- **Async Transaction Flow Visualization** - Interactive diagrams showing 3-phase async execution
-- **Scheduled Transaction Pool** - Real-time monitoring of cron-like blockchain jobs
-- **System Account Recognition** - Special handling for Ritual system accounts (0x...fa7e, fa8e, fa9e)
-- **Enhanced Transaction Types** - Support for Types 0x10 (Scheduled), 0x11 (AsyncCommitment), 0x12 (AsyncSettlement)
-- **Advanced Search** - Call ID search, origin transaction linking, precompile address recognition
-
-### ⚡ **High-Performance Real-Time Updates**
-- **WebSocket Integration** - Direct connection to RETH nodes for instant updates
-- **Multi-frequency Polling** - High-frequency mempool updates (2s), backup polling (5s)
-- **Smart Reconnection** - Exponential backoff with jitter for resilient connections
-- **Live Status Indicators** - Real-time connection status and subscriber count
-
-### 📊 **Advanced Analytics**
-- **Ritual Analytics Dashboard** - Async adoption metrics, protocol fee analysis
-- **Transaction Type Distribution** - Visual breakdown of all 5 transaction types
-- **System Account Activity** - Monitoring of automated vs user transactions
-- **Precompile Usage Statistics** - Top async precompile contracts
-
-## 🖼️ Screenshots
-
-${screenshots.map(page => `
-### ${page.title}
-
-![${page.title}](./docs/screenshots/${page.name}.png)
-
-${page.description}
-`).join('\n')}
-
-## 🏗️ Architecture
-
-### **Frontend Stack**
-- **Next.js 14** with App Router and React Server Components
-- **TypeScript** for complete type safety
-- **Tailwind CSS** with lime/black Ritual theme
-- **Real-time WebSocket** manager for live updates
-
-### **Blockchain Integration**
-- **Enhanced RETHClient** with Ritual-specific RPC methods
-- **Multi-node Support** with fallback mechanisms  
-- **Transaction Type Detection** for all 5 Ritual transaction types
-- **System Account Recognition** and special handling
-
-### **Real-Time Features**
-- **WebSocket Manager** with automatic reconnection
-- **React Hooks** for easy real-time integration
-- **Update Throttling** and type filtering
-- **Connection Status Monitoring**
-
-## 🚀 Getting Started
-
-### Prerequisites
-- Node.js 18+ 
-- Docker (optional)
-- Access to Ritual Chain RETH nodes
-
-### Installation
-
-\`\`\`bash
-# Clone the repository
-git clone <repository-url>
-cd ritual-explorer
-
-# Install dependencies
-npm install
-
-# Start development server
-npm run dev
-
-# Open browser to http://localhost:3000
-\`\`\`
-
-### Docker Deployment
-
-\`\`\`bash
-# Build and run with Docker
-docker build -t ritual-explorer .
-docker run -d -p 9000:3000 --name ritual-explorer ritual-explorer
-\`\`\`
-
-## 🔧 Configuration
-
-### Environment Variables
-
-\`\`\`env
-# RPC Configuration
-NEXT_PUBLIC_RPC_URL=http://35.185.40.237:8545
-NEXT_PUBLIC_WS_URL=ws://35.185.40.237:8546
-
-# Network Configuration  
-NEXT_PUBLIC_NETWORK_NAME=Shrinenet
-NEXT_PUBLIC_CURRENCY_SYMBOL=RITUAL
-\`\`\`
-
-### Real-Time WebSocket
-
-The explorer automatically connects to RETH WebSocket endpoints for:
-- New block headers (\`eth_subscribe\` → \`newHeads\`)
-- Pending transactions (\`eth_subscribe\` → \`newPendingTransactions\`)  
-- Mempool updates (high-frequency polling)
-- Scheduled transaction monitoring
-
-## 🎨 Ritual Chain Features
-
-### **Transaction Types Supported**
-
-| Type | Description | System Account | Features |
-|------|-------------|----------------|----------|
-| 0x0 | Legacy | N/A | Standard Ethereum transactions |
-| 0x2 | EIP-1559 | N/A | Enhanced gas mechanism |
-| 0x10 | Scheduled | 0x...fa7e | Cron-like execution, Call ID tracking |
-| 0x11 | AsyncCommitment | 0x...fa8e | TEE execution commitment |
-| 0x12 | AsyncSettlement | 0x...fa9e | Final settlement with fee distribution |
-
-### **Enhanced Search Patterns**
-
-- \`callId:10567\` - Search scheduled transactions by Call ID
-- \`origin:0x...\` - Find transactions by origin hash
-- \`10567\` - Numeric Call ID search
-- System account detection (fa7e, fa8e, fa9e)
-- Precompile addresses (0x...0801, etc.)
-
-## 📱 Pages & Features
-
-### **Core Pages**
-- **Homepage** - Network overview, latest blocks/transactions, stats
-- **Blocks** - Real-time block explorer with detailed views  
-- **Transactions** - Live transaction feed with type filtering
-- **Mempool** - Real-time mempool monitoring with WebSocket updates
-
-### **Ritual-Specific Pages**  
-- **Scheduled** - Scheduled transaction pool with Call ID filtering
-- **Ritual Analytics** - Advanced Ritual Chain metrics and adoption
-- **Transaction Details** - Enhanced with async flow visualization
-- **System Accounts** - Special pages for Ritual system addresses
-
-## 🔗 Live Demo
-
-**Production URL:** [Browser Preview Available](http://127.0.0.1:63901)
-
-**Real-Time Features:**
-- ✅ WebSocket connection to RETH nodes
-- ✅ Live mempool updates every 2 seconds  
-- ✅ New block notifications
-- ✅ Scheduled transaction monitoring
-- ✅ Connection status indicators
-
-## 🛠️ Development
-
-### **Project Structure**
-
-\`\`\`
-src/
-├── app/                    # Next.js App Router pages
-│   ├── page.tsx           # Homepage
-│   ├── blocks/            # Block explorer
-│   ├── transactions/      # Transaction explorer  
-│   ├── mempool/           # Real-time mempool
-│   ├── scheduled/         # Scheduled transactions
-│   ├── ritual-analytics/  # Ritual analytics
-│   └── tx/[txHash]/       # Transaction details
-├── components/            # Reusable components
-│   ├── AsyncTransactionFlow.tsx    # Async flow visualization
-│   ├── TransactionTypeBadge.tsx    # Type indicators
-│   └── EnhancedTransactionDetails.tsx  # Enhanced details
-├── hooks/                 # React hooks
-│   └── useRealtime.ts     # Real-time WebSocket hooks
-├── lib/                   # Core libraries
-│   ├── reth-client.ts     # Enhanced RETHClient
-│   └── realtime-websocket.ts  # WebSocket manager
-└── styles/               # Tailwind CSS configuration
-\`\`\`
-
-### **Key Components**
-
-- **RETHClient** - Enhanced with Ritual-specific RPC methods
-- **WebSocket Manager** - High-performance real-time updates
-- **Transaction Flow** - Async relationship visualization  
-- **System Recognition** - Ritual system account handling
-- **Search Enhancement** - Call ID and precompile search
-
-## 🔍 Testing
-
-### **Automated Testing**
-
-\`\`\`bash
-# Run component tests
-npm test
-
-# Generate screenshots  
-npm run screenshots
-
-# Test navigation flows
-node test-navigation.js
-\`\`\`
-
-### **Real-Time Testing**
-
-The explorer includes extensive real-time testing:
-- WebSocket connection monitoring
-- Transaction type detection
-- System account recognition  
-- Async flow visualization
-- Call ID search functionality
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch (\`git checkout -b feature/amazing-feature\`)
-3. Commit changes (\`git commit -m 'Add amazing feature'\`)
-4. Push to branch (\`git push origin feature/amazing-feature\`)  
-5. Open a Pull Request
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🙏 Acknowledgments
-
-- **Ritual Network** for the innovative async execution model
-- **RETH** for high-performance Ethereum execution
-- **Next.js Team** for the excellent React framework
-- **Etherscan** for UI/UX inspiration
-
----
-
-<div align="center">
-  <strong>Built with ❤️ for the Ritual Network ecosystem</strong>
-</div>
-`;
-
-  await fs.writeFile(readmePath, readmeContent);
-  console.log(`📝 README.md updated with screenshots`);
-}
-
 // Run the script
 if (require.main === module) {
   generateScreenshots()
-    .then(async (result) => {
-      await generateReadmeContent(result.screenshots);
+    .then(() => {
+      console.log('\n✅ Done!');
       process.exit(0);
     })
     .catch((error) => {
-      console.error('❌ Screenshot generation failed:', error);
+      console.error('\n❌ Screenshot generation failed:', error);
       process.exit(1);
     });
 }
 
-module.exports = { generateScreenshots, generateReadmeContent };
+module.exports = { generateScreenshots };

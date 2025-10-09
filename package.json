@@ -1,11 +1,30 @@
 {
-  "name": "etherscan-clone",
-  "version": "0.1.0",
-  "private": true,
+  "name": "ritual-scan",
+  "version": "1.0.0",
+  "description": "A modern blockchain explorer for Ritual Chain with real-time updates, async transaction support, and smart caching",
+  "author": "Ritual Network",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ritual-net/ritual-scan"
+  },
+  "keywords": [
+    "blockchain",
+    "explorer",
+    "ritual-chain",
+    "ethereum",
+    "web3",
+    "nextjs",
+    "typescript",
+    "real-time",
+    "websocket"
+  ],
+  "homepage": "https://ritual-scan.vercel.app",
+  "private": false,
   "scripts": {
-    "dev": "next dev --turbopack",
+    "dev": "next dev --turbopack -p 5558",
     "build": "next build --turbopack",
-    "start": "next start",
+    "start": "next start -p 5558",
     "lint": "eslint",
     "lint:fix": "eslint --fix",
     "type-check": "tsc --noEmit",
@@ -18,9 +37,9 @@
     "docker:dev": "docker-compose --profile dev up --build",
     "docker:prod": "docker-compose --profile prod up -d --build",
     "docker:build": "docker build -t etherscan-clone:latest .",
-    "docker:run": "docker run -p 3000:3000 etherscan-clone:latest",
+    "docker:run": "docker run -p 5051:3000 etherscan-clone:latest",
     "docker:stop": "docker-compose down",
-    "health": "curl -f http://localhost:3000/api/health || exit 1"
+    "health": "curl -f http://localhost:5051/api/health || exit 1"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",
@@ -60,12 +79,13 @@
     "@eslint/eslintrc": "^3",
     "@playwright/test": "^1.40.0",
     "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
+    "@types/node": "20.19.19",
     "@types/puppeteer": "^5.4.7",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/react-plotly.js": "^2.6.3",
     "@types/react-window": "^1.8.8",
+    "@types/ws": "^8.18.1",
     "eslint": "^9",
     "eslint-config-next": "15.5.4",
     "playwright": "^1.40.0",

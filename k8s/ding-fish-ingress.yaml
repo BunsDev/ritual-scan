@@ -1,0 +1,40 @@
+apiVersion: networking.gke.io/v1
+kind: ManagedCertificate
+metadata:
+  name: ding-fish-ssl-cert
+spec:
+  domains:
+    - ding.fish
+    - www.ding.fish
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ding-fish-ingress
+  annotations:
+    kubernetes.io/ingress.global-static-ip-name: "ding-fish-ip"
+    networking.gke.io/managed-certificates: "ding-fish-ssl-cert"
+    kubernetes.io/ingress.class: "gce"
+    kubernetes.io/ingress.allow-http: "true"
+spec:
+  rules:
+  - host: ding.fish
+    http:
+      paths:
+      - path: /*
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: ritual-explorer-service
+            port:
+              number: 80
+  - host: www.ding.fish
+    http:
+      paths:
+      - path: /*
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: ritual-explorer-service
+            port:
+              number: 80

@@ -1,7 +1,7 @@
 # GKE Quick Start Guide
 ## Ritual Blockchain Explorer
 
-### **🚀 One-Command Deployment**
+### One-Command Deployment
 
 ```bash
 # 1. Setup GKE cluster (one-time)
@@ -11,7 +11,7 @@ make setup-gke PROJECT_ID=your-gcp-project-id
 make deploy-gke PROJECT_ID=your-gcp-project-id
 ```
 
-### **📋 Prerequisites**
+### Prerequisites
 
 1. **Google Cloud SDK** installed and authenticated
    ```bash
@@ -25,9 +25,9 @@ make deploy-gke PROJECT_ID=your-gcp-project-id
 
 4. **Make** installed
 
-### **⚡ Quick Deployment Steps**
+### Quick Deployment Steps
 
-#### **Step 1: Setup GKE Cluster (5-10 minutes)**
+#### Step 1: Setup GKE Cluster (5-10 minutes)
 ```bash
 # Replace with your actual GCP project ID
 make setup-gke PROJECT_ID=my-ritual-project
@@ -39,7 +39,7 @@ This will:
 - Configure authentication
 - Setup service accounts
 
-#### **Step 2: Deploy Application (3-5 minutes)**
+#### Step 2: Deploy Application (3-5 minutes)
 ```bash
 # Deploy to the cluster
 make deploy-gke PROJECT_ID=my-ritual-project
@@ -51,7 +51,7 @@ This will:
 - Deploy to GKE cluster
 - Show access information
 
-### **🔧 Management Commands**
+### Management Commands
 
 ```bash
 # Check deployment status
@@ -67,24 +67,24 @@ make gke-shell
 make gke-scale REPLICAS=5
 
 # Port forward for local access
-kubectl port-forward service/ritual-explorer-service 8080:80
+kubectl port-forward service/ritual-scan-service 8080:80
 # Access at http://localhost:8080
 ```
 
-### **🌐 Accessing Your Application**
+### Accessing Your Application
 
 After deployment, get the external IP:
 ```bash
-kubectl get services ritual-explorer-service
+kubectl get services ritual-scan-service
 ```
 
 Or use port forwarding for immediate access:
 ```bash
-kubectl port-forward service/ritual-explorer-service 8080:80
+kubectl port-forward service/ritual-scan-service 8080:80
 # Open http://localhost:8080
 ```
 
-### **💰 Cost Estimate**
+### Cost Estimate
 
 | Component | Configuration | Monthly Cost |
 |-----------|---------------|--------------|
@@ -93,7 +93,7 @@ kubectl port-forward service/ritual-explorer-service 8080:80
 | **Container Registry** | 5GB storage | $1 |
 | **Total** | | **~$65-80/month** |
 
-### **🔧 Configuration**
+### Configuration
 
 #### **Environment Variables**
 Copy and customize the template:
@@ -106,10 +106,10 @@ cp .env.gke.template .env.gke
 Update `k8s/deployment.yaml`:
 ```yaml
 # Line 90 & 93
-- ritual-explorer.YOUR_DOMAIN.com
+- ritual-scan.YOUR_DOMAIN.com
 ```
 
-### **🛠️ Troubleshooting**
+### Troubleshooting
 
 #### **Common Issues**
 
@@ -131,17 +131,17 @@ gcloud auth configure-docker
 **Pods Not Starting:**
 ```bash
 # Check pod logs
-kubectl logs -l app=ritual-explorer
-kubectl describe pods -l app=ritual-explorer
+kubectl logs -l app=ritual-scan
+kubectl describe pods -l app=ritual-scan
 ```
 
 **No External IP:**
 ```bash
 # Check load balancer provisioning
-kubectl get services ritual-explorer-service -w
+kubectl get services ritual-scan-service -w
 ```
 
-### **🔒 Production Considerations**
+### Production Considerations
 
 #### **Security**
 - Enable network policies
@@ -159,7 +159,7 @@ kubectl get services ritual-explorer-service -w
 - Pod disruption budgets
 - Backup strategies
 
-### **🧹 Cleanup**
+### Cleanup
 
 To delete everything:
 ```bash
@@ -167,10 +167,10 @@ To delete everything:
 make gke-cleanup
 
 # Delete cluster (saves costs)
-gcloud container clusters delete ritual-explorer-cluster --region=us-central1
+gcloud container clusters delete ritual-scan-cluster --region=us-central1
 ```
 
-### **📚 Advanced Usage**
+### Advanced Usage
 
 #### **Custom Cluster Configuration**
 ```bash

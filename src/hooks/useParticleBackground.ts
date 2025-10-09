@@ -6,15 +6,21 @@ interface UseParticleBackgroundOptions {
   opacity?: number
 }
 
+// Global flag to track if particle background is initialized
+let particleBackgroundInitialized = false
+
 export function useParticleBackground(options: UseParticleBackgroundOptions = {}) {
   const { color = '#346d22', opacity = 0.25 } = options
 
   useEffect(() => {
-    // Check if canvas already exists (avoid duplicates)
-    if (document.getElementById('particle-bg')) {
+    // Only create particle background ONCE across entire app lifecycle
+    if (particleBackgroundInitialized) {
       return
     }
-
+    
+    particleBackgroundInitialized = true
+    console.log('🎨 Creating particle background (ONE-TIME global setup)')
+    
     const canvas = document.createElement('canvas')
     canvas.id = 'particle-bg'
     canvas.width = window.innerWidth
@@ -183,6 +189,8 @@ void main() {
       gl.viewport(0, 0, canvas.width, canvas.height)
     }
 
+    let animationFrameId: number
+    
     function render() {
       gl.clearColor(0,0,0,1)
       gl.clear(gl.COLOR_BUFFER_BIT)
@@ -199,19 +207,16 @@ void main() {
       gl.enable(gl.BLEND)
       gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
       gl.drawArrays(gl.TRIANGLES, 0, 6)
-      setTimeout(render, 16)
+      
+      animationFrameId = requestAnimationFrame(render)
     }
 
     resizeCanvas()
     window.addEventListener('resize', resizeCanvas)
-    render()
+    animationFrameId = requestAnimationFrame(render)
 
-    return () => {
-      window.removeEventListener('resize', resizeCanvas)
-      const existingCanvas = document.getElementById('particle-bg')
-      if (existingCanvas) {
-        document.body.removeChild(existingCanvas)
-      }
-    }
+    // No cleanup function - particle background runs for entire session
+    // Canvas, WebGL context, and animation loop persist across all navigation
+    // Browser automatically cleans up on tab close
   }, [color, opacity])
 }

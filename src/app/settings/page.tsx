@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { rethClient, RpcConfig } from '@/lib/reth-client'
+import { getRealtimeManager } from '@/lib/realtime-websocket'
 import { Navigation } from '@/components/Navigation'
 import Link from 'next/link'
 import { useParticleBackground } from '@/hooks/useParticleBackground'
@@ -23,21 +24,38 @@ export default function SettingsPage() {
   const [presets] = useState<RpcConfig[]>([
     {
       name: 'Default Shrinenet',
-      primary: 'http://35.185.40.237:8545',
+      primary: 'http://104.196.102.16:8545',
       backup: 'http://130.211.246.58:8545',
-      websocket: 'ws://35.185.40.237:8546'
+      websocket: 'ws://104.196.102.16:8546'
     },
     {
       name: 'Shrinenet Backup',
       primary: 'http://130.211.246.58:8545',
-      backup: 'http://35.185.40.237:8545',
+      backup: 'http://104.196.102.16:8545',
       websocket: 'ws://130.211.246.58:8546'
     }
   ])
 
   useEffect(() => {
-    const currentConfig = rethClient.getConfiguration()
-    setConfig(currentConfig)
+    // Check if we just reloaded after RPC change (config in sessionStorage)
+    const savedConfig = sessionStorage.getItem('ritual-scan-new-rpc-config')
+    if (savedConfig) {
+      try {
+        const restoredConfig = JSON.parse(savedConfig)
+        console.log('🔄 Restoring RPC config after cache clear:', restoredConfig)
+        rethClient.updateConfiguration(restoredConfig)
+        setConfig(restoredConfig)
+        // Clear the temp storage
+        sessionStorage.removeItem('ritual-scan-new-rpc-config')
+        console.log('✅ RPC config restored and applied')
+      } catch (e) {
+        console.warn('Failed to restore config:', e)
+      }
+    } else {
+      // Normal load - get current config
+      const currentConfig = rethClient.getConfiguration()
+      setConfig(currentConfig)
+    }
 
     const unsubscribe = rethClient.onConfigurationChange((newConfig) => {
       setConfig(newConfig)
@@ -67,7 +85,68 @@ export default function SettingsPage() {
   const saveConfiguration = async () => {
     setLoading(true)
     try {
+      // Get old configuration before updating
+      const oldConfig = rethClient.getConfiguration()
+      
+      // Check if RPC URLs changed
+      const rpcChanged = 
+        oldConfig.primary !== config.primary ||
+        oldConfig.websocket !== config.websocket
+      
+      // Update configuration
       rethClient.updateConfiguration(config)
+      
+      // If RPC changed, clear all caches (switching to different chain)
+      if (rpcChanged) {
+        console.log('🔄 RPC configuration changed - PURGING ALL CACHES...')
+        
+        // Step 1: Set flag in sessionStorage to prevent cache restoration on next load
+        sessionStorage.setItem('ritual-scan-skip-cache-restore', 'true')
+        sessionStorage.setItem('ritual-scan-new-rpc-config', JSON.stringify(config))
+        console.log('  ✓ Set skip-restore flag + saved new config to sessionStorage')
+        
+        // Step 2: Disconnect and destroy WebSocket manager
+        const manager = getRealtimeManager()
+        if (manager) {
+          manager.disconnect()
+          console.log('  ✓ Disconnected WebSocket')
+        }
+        
+        // Step 3: Delete singleton instance (critical!)
+        if (typeof window !== 'undefined') {
+          if ((window as any).__realtimeManager) {
+            delete (window as any).__realtimeManager
+            console.log('  ✓ Deleted singleton')
+          }
+        }
+        
+        // Step 4: NUKE ALL localStorage (cache data gone, but config saved in session)
+        try {
+          localStorage.clear()
+          console.log('  ✓ Cleared ALL localStorage')
+        } catch (e) {
+          console.warn('  ⚠️ Could not clear localStorage:', e)
+        }
+        
+        // Step 5: Clear Next.js service worker caches
+        if ('caches' in window) {
+          caches.keys().then(names => {
+            names.forEach(name => {
+              caches.delete(name)
+              console.log(`  ✓ Deleted cache: ${name}`)
+            })
+          })
+        }
+        
+        // Step 6: HARD reload with cache bypass
+        console.log('🔄 HARD RELOAD in 1 second...')
+        console.log('💥 ALL CACHES NUKED - RPC config will be restored on load!')
+        setTimeout(() => {
+          // Hard reload bypassing cache
+          window.location.href = window.location.href.split('?')[0] + '?t=' + Date.now()
+        }, 1000)
+      }
+      
       setSaved(true)
       setTimeout(() => setSaved(false), 3000)
     } catch (error) {
@@ -129,7 +208,7 @@ export default function SettingsPage() {
           </p>
         </div>
 
-        <div className="grid gap-8 lg:grid-cols-2">
+        <div className="max-w-3xl mx-auto">
           {/* Current Configuration */}
           <div className="bg-black/20 backdrop-blur-sm shadow-lg overflow-hidden rounded-lg border border-lime-800/30">
             <div className="px-6 py-4 border-b border-lime-800/30">
@@ -178,32 +257,6 @@ export default function SettingsPage() {
                 </div>
               </div>
 
-              {/* Backup RPC */}
-              <div>
-                <label className="block text-sm font-medium text-lime-300 mb-2">
-                  Backup RPC URL (Optional)
-                </label>
-                <div className="space-y-2">
-                  <div className="flex space-x-2">
-                    <input
-                      type="text"
-                      value={config.backup || ''}
-                      onChange={(e) => setConfig(prev => ({ ...prev, backup: e.target.value }))}
-                      className="flex-1 px-3 py-2 bg-lime-900/20 border border-lime-600/30 rounded-md text-white placeholder-lime-400 focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-transparent"
-                      placeholder="http://backup-node:8545"
-                    />
-                    <button
-                      onClick={() => testConnection(config.backup || '', 'backup')}
-                      disabled={!config.backup || testing.backup}
-                      className="px-4 py-2 bg-lime-600 text-white rounded-md hover:bg-lime-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    >
-                      Test
-                    </button>
-                  </div>
-                  <ConnectionStatus type="backup" />
-                </div>
-              </div>
-
               {/* WebSocket URL */}
               <div>
                 <label className="block text-sm font-medium text-lime-300 mb-2">
@@ -218,6 +271,19 @@ export default function SettingsPage() {
                     placeholder="ws://127.0.0.1:8546"
                   />
                   <p className="text-lime-400 text-xs">Required for real-time updates</p>
+                  {typeof window !== 'undefined' && window.location.protocol === 'https:' && 
+                   config.websocket && config.websocket !== 'ws://104.196.102.16:8546' && (
+                    <div className="mt-2 p-3 bg-yellow-900/20 border border-yellow-600/30 rounded-md">
+                      <p className="text-yellow-300 text-xs flex items-start gap-2">
+                        <span className="text-yellow-400 flex-shrink-0">⚠️</span>
+                        <span>
+                          <strong>HTTPS Limitation:</strong> Custom WebSocket URLs may fall back to polling on HTTPS.
+                          Default URL (ws://104.196.102.16:8546) uses Cloudflare Tunnel for real-time updates.
+                          For full WebSocket support with custom RPC, use HTTP deployment or add your RPC to the tunnel route.
+                        </span>
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -235,55 +301,6 @@ export default function SettingsPage() {
                     <span className="text-sm">✅ Saved!</span>
                   </div>
                 )}
-              </div>
-            </div>
-          </div>
-
-          {/* Presets */}
-          <div className="bg-black/20 backdrop-blur-sm shadow-lg overflow-hidden rounded-lg border border-lime-800/30">
-            <div className="px-6 py-4 border-b border-lime-800/30">
-              <h3 className="text-lg font-medium text-white">Configuration Presets</h3>
-              <p className="text-lime-300 text-sm">Quick setup for common networks</p>
-            </div>
-            
-            <div className="p-6">
-              <div className="space-y-4">
-                {presets.map((preset, index) => (
-                  <div 
-                    key={index}
-                    className="p-4 bg-lime-900/10 border border-lime-700/30 rounded-lg hover:bg-lime-900/20 transition-colors"
-                  >
-                    <div className="flex justify-between items-start mb-2">
-                      <h4 className="font-medium text-white">{preset.name}</h4>
-                      <button
-                        onClick={() => loadPreset(preset)}
-                        className="px-3 py-1 text-xs bg-lime-600 text-white rounded hover:bg-lime-700 transition-colors"
-                      >
-                        Load
-                      </button>
-                    </div>
-                    <div className="space-y-1 text-sm text-lime-300">
-                      <div><span className="text-lime-400">Primary:</span> {preset.primary}</div>
-                      {preset.backup && <div><span className="text-lime-400">Backup:</span> {preset.backup}</div>}
-                      {preset.websocket && <div><span className="text-lime-400">WebSocket:</span> {preset.websocket}</div>}
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="mt-6 p-4 bg-yellow-900/20 border border-yellow-600/30 rounded-lg">
-                <div className="flex items-start space-x-2">
-                  <span className="text-yellow-400 text-sm">⚠️</span>
-                  <div className="text-yellow-300 text-sm">
-                    <p className="font-medium">Important Notes:</p>
-                    <ul className="mt-1 space-y-1 text-xs">
-                      <li>• Changes take effect immediately</li>
-                      <li>• WebSocket connection will be re-established</li>
-                      <li>• Test connections before saving</li>
-                      <li>• Settings are saved in browser localStorage</li>
-                    </ul>
-                  </div>
-                </div>
               </div>
             </div>
           </div>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useTransition } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { rethClient } from '@/lib/reth-client'
 import { Navigation } from '@/components/Navigation'
 import { getRealtimeManager } from '@/lib/realtime-websocket'
@@ -25,14 +25,69 @@ export default function TransactionsPage() {
   useParticleBackground()
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [initialLoading, setInitialLoading] = useState(true)
-  const [isUpdating, setIsUpdating] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [latestBlock, setLatestBlock] = useState<number>(0)
-  const [isPending, startTransition] = useTransition()
   const [lastUpdateTime, setLastUpdateTime] = useState<number>(0)
 
+  // Smart cache loader for transactions
+  const loadFromCache = () => {
+    try {
+      const manager = getRealtimeManager()
+      if (!manager) return false
+      
+      const cachedBlocks = manager.getCachedBlocks()
+      const cachedTransactions: Transaction[] = [] // Note: recentTransactionsCache not implemented yet
+      
+      if (cachedTransactions && cachedTransactions.length > 0) {
+        console.log(`🚀 [Transactions] Using ${cachedTransactions.length} cached transactions for instant load`)
+        setTransactions(cachedTransactions.slice(0, 50))
+        setInitialLoading(false)
+        return true
+      }
+      
+      // Fallback: extract transactions from cached blocks
+      if (cachedBlocks && cachedBlocks.length > 0) {
+        console.log(`🚀 [Transactions] Extracting transactions from ${cachedBlocks.length} cached blocks`)
+        const allTransactions: Transaction[] = []
+        
+        for (const block of cachedBlocks.slice(0, 20)) {
+          if (block.transactions && Array.isArray(block.transactions)) {
+            // Check if we have full transaction objects or just hashes
+            const firstTx = block.transactions[0]
+            if (typeof firstTx === 'object' && firstTx.hash) {
+              // Full transaction objects available
+              for (const tx of block.transactions.slice(0, 10)) {
+                if (tx && tx.hash) {
+                  allTransactions.push(tx as Transaction)
+                }
+              }
+            }
+            // If we only have hashes (strings), skip this block and rely on API fetch
+          }
+        }
+        
+        console.log(`📦 [Transactions] Extracted ${allTransactions.length} transactions from cache`)
+        
+        if (allTransactions.length > 0) {
+          setTransactions(allTransactions.slice(0, 50))
+          setInitialLoading(false)
+          return true
+        }
+      }
+      
+      console.log(`⚠️ [Transactions] No cached transactions available, will fetch from API`)
+      return false // No cached data available
+    } catch (error) {
+      console.warn('⚠️ [Transactions] Failed to load cached data:', error)
+      return false
+    }
+  }
+
   useEffect(() => {
-    loadTransactions()
+    // Try cache first, fallback to API
+    if (!loadFromCache()) {
+      loadTransactions()
+    }
     
     // Set up realtime updates using the enhanced WebSocket manager
     const realtimeManager = getRealtimeManager()
@@ -61,58 +116,58 @@ export default function TransactionsPage() {
     if (now - lastUpdateTime < 2000) return // Max 1 update per 2 seconds
     
     setLastUpdateTime(now)
-    setIsUpdating(true)
     
     try {
-      startTransition(async () => {
-        // Get recent blocks with transactions  
-        const recentBlocks = await rethClient.getRecentBlocks(5)
-        const recentTransactions: Transaction[] = []
-        
-        for (const block of recentBlocks.slice(0, 3)) {
-          if (block.transactions && Array.isArray(block.transactions)) {
-            for (const tx of block.transactions.slice(0, 10)) {
-              if (tx && typeof tx === 'object' && tx.hash) {
-                recentTransactions.push(tx)
-                if (recentTransactions.length >= 50) break
-              }
+      // Get recent blocks with transactions  
+      const recentBlocks = await rethClient.getRecentBlocks(5)
+      const recentTransactions: Transaction[] = []
+      
+      for (const block of recentBlocks.slice(0, 3)) {
+        if (block.transactions && Array.isArray(block.transactions)) {
+          for (const tx of block.transactions.slice(0, 10)) {
+            if (tx && typeof tx === 'object' && tx.hash) {
+              recentTransactions.push(tx)
+              if (recentTransactions.length >= 50) break
             }
           }
-          if (recentTransactions.length >= 50) break
         }
-        
-        setTransactions(prevTransactions => {
-          // Smart merge - only update if we have new transactions
-          if (recentTransactions.length > 0 && prevTransactions.length > 0) {
-            const latestPrevTx = prevTransactions[0]?.hash
-            const latestNewTx = recentTransactions[0]?.hash
-            
-            // Only update if we have a different latest transaction
-            if (latestNewTx !== latestPrevTx) {
-              return recentTransactions
-            }
-            return prevTransactions
+        if (recentTransactions.length >= 50) break
+      }
+      
+      setTransactions(prevTransactions => {
+        // Smart merge - only update if we have new transactions
+        if (recentTransactions.length > 0 && prevTransactions.length > 0) {
+          const latestPrevTx = prevTransactions[0]?.hash
+          const latestNewTx = recentTransactions[0]?.hash
+          
+          // Only update if we have a different latest transaction
+          if (latestNewTx !== latestPrevTx) {
+            return recentTransactions
           }
-          return recentTransactions
-        })
+          return prevTransactions
+        }
+        return recentTransactions
       })
     } catch (error) {
       console.warn('Silent transactions update failed:', error)
-    } finally {
-      setIsUpdating(false)
     }
   }, [lastUpdateTime])
 
   const loadTransactions = async () => {
     try {
+      console.log('📥 [Transactions] loadTransactions() called')
       setInitialLoading(true)
       setError(null)
       
       // Get recent blocks with transactions
+      console.log('📥 [Transactions] Fetching 5 recent blocks...')
       const recentBlocks = await rethClient.getRecentBlocks(5)
+      console.log(`📥 [Transactions] Got ${recentBlocks.length} blocks`)
+      
       const allTransactions: Transaction[] = []
       
       for (const block of recentBlocks) {
+        console.log(`  Block ${parseInt(block.number, 16)}: ${block.transactions?.length || 0} transactions (type: ${typeof block.transactions?.[0]})`)
         if (block.transactions && Array.isArray(block.transactions)) {
           // Get full transaction details for each tx in the block
           for (const tx of block.transactions.slice(0, 10)) { // Limit to 10 txs per block
@@ -123,6 +178,7 @@ export default function TransactionsPage() {
         }
       }
       
+      console.log(`📥 [Transactions] Extracted ${allTransactions.length} total transactions`)
       setTransactions(allTransactions.slice(0, 50)) // Show latest 50 transactions
       
       if (recentBlocks.length > 0) {
@@ -130,6 +186,7 @@ export default function TransactionsPage() {
         setLatestBlock(latest)
       }
     } catch (err) {
+      console.error('❌ [Transactions] loadTransactions() error:', err)
       setError(err instanceof Error ? err.message : 'Failed to load transactions')
     } finally {
       setInitialLoading(false)
@@ -187,12 +244,6 @@ export default function TransactionsPage() {
                 Real-time transactions from RETH nodes • Latest Block: #{latestBlock.toLocaleString()}
               </p>
             </div>
-            {isUpdating && (
-              <div className="flex items-center space-x-2 text-sm text-lime-400">
-                <div className="w-2 h-2 bg-lime-400 rounded-full animate-pulse"></div>
-                <span>Updating transactions...</span>
-              </div>
-            )}
           </div>
           <div className="mt-4 p-4 bg-white/5 border border-lime-500/20 rounded-lg">
             <TransactionTypeLegend />
@@ -226,7 +277,7 @@ export default function TransactionsPage() {
           </div>
         ) : (
           <div className="bg-white/5 backdrop-blur-sm shadow-lg overflow-hidden sm:rounded-md border border-lime-500/20">
-            <ul className={`divide-y divide-lime-500/10 transition-opacity duration-300 ${isPending ? 'opacity-75' : 'opacity-100'}`}>
+            <ul className="divide-y divide-lime-500/10">
               {transactions.map((tx) => (
                 <li key={tx.hash} className="px-6 py-4 hover:bg-lime-500/5">
                   <div className="flex items-center justify-between">

@@ -25,7 +25,6 @@ export function ParticleToggleSimple() {
       const canvas = document.getElementById('particle-bg');
       if (canvas) {
         canvas.style.display = isEnabled ? 'block' : 'none';
-        console.log('Applied particle state:', isEnabled ? 'enabled' : 'disabled');
       }
     };
 
@@ -101,7 +100,7 @@ export function ParticleToggleSimple() {
         {showControls && (
           <div className="absolute bottom-full right-0 mb-2 bg-black/80 backdrop-blur-sm border border-lime-500/20 rounded-lg p-3 min-w-[200px] transition-all duration-200">
             <div className="text-xs text-lime-400 font-semibold mb-2">
-              Particle Background
+              Ritualization
             </div>
             
             <div className="space-y-2">

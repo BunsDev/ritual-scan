@@ -29,38 +29,60 @@ export default function ScheduledPage() {
   const [filteredTxs, setFilteredTxs] = useState<ScheduledTransaction[]>([])
   const [initialLoading, setInitialLoading] = useState(true)
   const [isUpdating, setIsUpdating] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const [lastUpdateTime, setLastUpdateTime] = useState<number>(0)
   const [searchCallId, setSearchCallId] = useState('')
   const [lastUpdateDisplay, setLastUpdateDisplay] = useState<string>('')
+  const [error, setError] = useState<string | null>(null)
+
+  // Smart cache loader for scheduled transactions
+  const loadFromCache = () => {
+    try {
+      const manager = getRealtimeManager()
+      if (!manager) return false
+      
+      const cachedScheduled = manager.getCachedScheduledTxs()
+      
+      if (cachedScheduled && cachedScheduled.length > 0) {
+        console.log(`🚀 [Scheduled] Using ${cachedScheduled.length} cached scheduled transactions for instant load`)
+        setScheduledTxs(cachedScheduled)
+        filterTransactions(cachedScheduled, searchCallId)
+        setInitialLoading(false)
+        return true
+      }
+      
+      return false // No cached data available
+    } catch (error) {
+      console.warn('⚠️ [Scheduled] Failed to load cached data:', error)
+      return false
+    }
+  }
 
   useEffect(() => {
-    loadScheduledTransactions()
-    
-    // Set up HTTP polling instead of WebSocket
-    const interval = setInterval(() => {
-      silentUpdate()
-    }, 5000) // Poll every 5 seconds
-    
-    return () => clearInterval(interval)
-  }, [])
-
-  // Silent update for polling
-  const silentUpdate = useCallback(async () => {
-    const now = Date.now()
-    if (now - lastUpdateTime < 2000) return // Throttle to max 1 update per 2 seconds
-    
-    try {
-      startTransition(async () => {
-        await loadScheduledTransactions()
-      })
-    } catch (error) {
-      console.warn('Silent scheduled update failed:', error)
-    } finally {
-      setIsUpdating(false)
+    // Try cache first, fallback to API
+    if (!loadFromCache()) {
+      loadScheduledTransactions()
     }
-  }, [lastUpdateTime])
+    
+    const realtimeManager = getRealtimeManager()
+    const unsubscribe = realtimeManager?.subscribe('scheduled-page', (update) => {
+      if (update.type === 'scheduledUpdate') {
+        console.log('📅 [Scheduled] New scheduled transactions:', update.data)
+        
+        startTransition(() => {
+          setScheduledTxs(update.data || [])
+          filterTransactions(update.data || [], searchCallId)
+          setLastUpdateTime(Date.now())
+        })
+      }
+    })
+
+    return () => {
+      if (unsubscribe) {
+        unsubscribe()
+      }
+    }
+  }, [])
 
   useEffect(() => {
     filterTransactions(scheduledTxs, searchCallId)

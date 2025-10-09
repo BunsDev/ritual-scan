@@ -164,6 +164,11 @@
   }
   body {
     @apply bg-background text-foreground;
+    background-color: #000000 !important;
+  }
+  
+  html {
+    background-color: #000000 !important;
   }
   
   /* Improved scrollbars */

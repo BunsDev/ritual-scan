@@ -33,15 +33,8 @@ export default function HomePage() {
   const realtimeStats = useRealtimeStats()
   const transactionFeed = useTransactionFeed(20)
 
-  // Debug WebSocket connection status
-  useEffect(() => {
-    console.log('🌐 WebSocket stats:', {
-      latestBlock: realtimeStats.latestBlock,
-      gasPrice: realtimeStats.gasPrice,
-      transactionCount: transactionFeed.length,
-      lastUpdate: new Date(realtimeStats.lastUpdate).toLocaleTimeString()
-    })
-  }, [realtimeStats, transactionFeed])
+  // WebSocket connection status (silent - no logs)
+  // Stats are available in realtimeStats and transactionFeed
 
   // Add particle background (using working implementation)
   useParticleBackground({ 
@@ -56,15 +49,13 @@ export default function HomePage() {
   // Lightweight block refresh for WebSocket updates
   const refreshBlocks = useCallback(async () => {
     try {
-      console.log('📊 Refreshing blocks via WebSocket trigger...')
       const recentBlocks = await rethClient.getRecentBlocks(10)
-      console.log('📦 Updated blocks:', recentBlocks.map(b => `${b.number}(${b.transactions?.length || 0} txs)`))
       
       // Extract transactions from recent blocks for real-time count update
       const allRecentTransactions: any[] = []
       for (const block of recentBlocks.slice(0, 3)) { // Last 3 blocks like the label says
         if (block.transactions && Array.isArray(block.transactions)) {
-          for (const tx of block.transactions.slice(0, 5)) { // Limit per block
+          for (const tx of block.transactions) { // No limit - count all transactions
             if (tx && typeof tx === 'object' && tx.hash) {
               allRecentTransactions.push({
                 hash: tx.hash,
@@ -74,10 +65,8 @@ export default function HomePage() {
                 value: tx.value,
                 timestamp: block.timestamp || Date.now() / 1000
               })
-              if (allRecentTransactions.length >= 15) break // Max 15 total
             }
           }
-          if (allRecentTransactions.length >= 15) break
         }
       }
       
@@ -99,7 +88,6 @@ export default function HomePage() {
         const blockChanged = prev.latestBlock !== realtimeStats.latestBlock
         
         if (blockChanged) {
-          console.log('🔄 Block changed via WebSocket:', prev.latestBlock, '→', realtimeStats.latestBlock)
           // Async fetch new blocks data without blocking the UI
           refreshBlocks().catch(err => console.warn('Failed to update blocks:', err))
         }
@@ -110,12 +98,13 @@ export default function HomePage() {
           gasPrice: realtimeStats.gasPrice,
           // Update transactions from real-time feed - prioritize live feed over block-based count
           recentTransactions: transactionFeed.length > 0 ? 
-            transactionFeed.slice(0, 15).map(tx => ({ hash: tx.hash, status: tx.status })) :
+            transactionFeed.map(tx => ({ hash: tx.hash, status: tx.status })) :
             prev.recentTransactions // Keep existing if no live feed yet
         }
       })
     }
-  }, [realtimeStats, transactionFeed, refreshBlocks])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [realtimeStats.latestBlock])
 
   // High-performance silent update for real-time changes
   const silentUpdate = useCallback(async (newBlockData?: any) => {
@@ -209,12 +198,12 @@ export default function HomePage() {
       console.log('🔍 Loading recent transactions from', recentBlocks.length, 'blocks')
       console.log('🔍 Recent blocks:', recentBlocks.map(b => `${b.number}(${b.transactions?.length || 0} txs)`))
       
-      for (const block of recentBlocks.slice(0, 3)) { // Only check first 3 blocks for faster loading
+      for (const block of recentBlocks.slice(0, 3)) { // Only check first 3 blocks
         if (block.transactions && Array.isArray(block.transactions) && block.transactions.length > 0) {
           console.log(`📦 Block ${block.number} has ${block.transactions.length} transactions`)
           
           // Transactions are already full objects when includeTransactions=true
-          for (const tx of block.transactions.slice(0, 3)) {
+          for (const tx of block.transactions) { // No limit - count all transactions
             if (tx && typeof tx === 'object' && tx.hash) {
               console.log(`✅ Processing transaction object: ${tx.hash}`)
               recentTransactions.push({
@@ -222,7 +211,6 @@ export default function HomePage() {
                 timestamp: block.timestamp || Date.now() / 1000
               })
               console.log(`✅ Added transaction ${tx.hash.slice(0, 10)}... from block ${block.number}`)
-              if (recentTransactions.length >= 10) break
             } else if (typeof tx === 'string' && tx.startsWith('0x')) {
               // Fallback: if we get hashes instead of objects, fetch them
               try {
@@ -234,7 +222,6 @@ export default function HomePage() {
                     timestamp: block.timestamp || Date.now() / 1000
                   })
                   console.log(`✅ Added fetched transaction ${txData.hash.slice(0, 10)}... from block ${block.number}`)
-                  if (recentTransactions.length >= 10) break
                 }
               } catch (txError) {
                 console.warn(`❌ Failed to fetch transaction ${tx}:`, txError)
@@ -243,7 +230,6 @@ export default function HomePage() {
               console.warn(`⚠️ Invalid transaction format:`, typeof tx, tx)
             }
           }
-          if (recentTransactions.length >= 10) break
         } else {
           console.log(`📦 Block ${block.number} has no transactions or invalid transaction format`)
           console.log(`📦 Block transactions data:`, block.transactions)
@@ -326,7 +312,7 @@ export default function HomePage() {
       <div className="bg-gradient-to-r from-black via-lime-500/10 to-black border-b border-lime-500/20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="text-center mb-6">
-            <h1 className="text-3xl font-bold text-white mb-2">Ritual Chain Explorer</h1>
+            <h1 className="text-3xl font-bold text-white mb-6">Ritual Chain Explorer</h1>
             <div className="flex justify-center">
               <SearchBar />
             </div>
@@ -359,16 +345,6 @@ export default function HomePage() {
         {/* Price Banner */}
         <div className="bg-white/5 border-b border-lime-500/20">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-            <div className="flex flex-wrap items-center justify-between text-sm">
-              <div className="flex items-center space-x-6">
-                <div className="text-lime-300">
-                  RITUAL Price: <span className="text-white font-medium">Higher</span>
-                </div>
-                <div className="text-lime-300">
-                  Gas: <span className="text-white font-medium">{initialLoading ? '...' : `${stats.gasPrice} Gwei`}</span>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
 
@@ -376,43 +352,26 @@ export default function HomePage() {
         <div className="bg-white/5">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              <div className="bg-black/50 border border-lime-500/20 rounded-lg p-4">
-                <div className="flex items-center space-x-3">
-                  <div className="text-lime-400">RITUAL PRICE</div>
-                </div>
-                <div className="mt-2">
-                  <div className="text-2xl font-bold text-white">Higher</div>
-                  <div className="text-sm text-lime-300">Trending upward</div>
-                </div>
+              <div className="bg-black/50 border border-lime-500/20 rounded-lg p-6">
+                <div className="text-lime-400 text-sm mb-2">RITUAL PRICE</div>
+                <div className="text-3xl font-bold text-white">Higher</div>
               </div>
               
-              <div className="bg-black/50 border border-lime-500/20 rounded-lg p-4">
-                <div className="flex items-center space-x-3">
-                  <div className="text-lime-400">RECENT TRANSACTIONS</div>
-                </div>
-                <div className="mt-2">
-                  <div className="text-2xl font-bold text-white">{initialLoading ? '...' : stats.recentTransactions.length.toLocaleString()}</div>
-                  <div className="text-sm text-lime-300">From last 3 blocks</div>
+              <div className="bg-black/50 border border-lime-500/20 rounded-lg p-6">
+                <div className="text-lime-400 text-sm mb-2">RECENT TRANSACTIONS</div>
+                <div className="text-3xl font-bold text-white">{initialLoading ? '...' : stats.recentTransactions.length.toLocaleString()}</div>
+              </div>
+
+              <div className="bg-black/50 border border-lime-500/20 rounded-lg p-6">
+                <div className="text-lime-400 text-sm mb-2">MED GAS PRICE</div>
+                <div className="text-3xl font-bold text-white">
+                  {initialLoading ? '...' : stats.gasPrice < 0.01 ? `${(stats.gasPrice * 1e9).toFixed(0)}e-9 Gwei` : `${stats.gasPrice.toFixed(2)} Gwei`}
                 </div>
               </div>
 
-              <div className="bg-black/50 border border-lime-500/20 rounded-lg p-4">
-                <div className="flex items-center space-x-3">
-                  <div className="text-lime-400">MED GAS PRICE</div>
-                </div>
-                <div className="mt-2">
-                  <div className="text-2xl font-bold text-white">{initialLoading ? '...' : `${stats.gasPrice} Gwei`}</div>
-                  <div className="text-sm text-lime-300">($0.01)</div>
-                </div>
-              </div>
-
-              <div className="bg-black/50 border border-lime-500/20 rounded-lg p-4">
-                <div className="flex items-center space-x-3">
-                  <div className="text-lime-400">LAST FINALIZED BLOCK</div>
-                </div>
-                <div className="mt-2">
-                  <div className="text-2xl font-bold text-white">{initialLoading ? '...' : stats.latestBlock.toLocaleString()}</div>
-                </div>
+              <div className="bg-black/50 border border-lime-500/20 rounded-lg p-6">
+                <div className="text-lime-400 text-sm mb-2">LAST FINALIZED BLOCK</div>
+                <div className="text-3xl font-bold text-white">{initialLoading ? '...' : stats.latestBlock.toLocaleString()}</div>
               </div>
             </div>
           </div>

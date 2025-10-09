@@ -7,6 +7,7 @@ import { EnhancedTransactionDetails } from '@/components/EnhancedTransactionDeta
 import { AsyncTransactionFlow } from '@/components/AsyncTransactionFlow'
 import { ScheduledTransactionFlow } from '@/components/ScheduledTransactionFlow'
 import { ContractInteractionDisplay } from '@/components/ContractInteractionDisplay'
+import { PrecompileDataDisplay } from '@/components/PrecompileDataDisplay'
 import Link from 'next/link'
 import { TransactionTypeChip } from '@/components/TransactionTypeChip'
 import { RitualEventDisplay, RitualTransactionCategoryBadge, RitualPrecompileIndicator } from '@/components/RitualEventDisplayProduction'
@@ -201,6 +202,19 @@ export default function TransactionDetailPage({ params }: PageProps) {
 
         {/* Enhanced Transaction Details Component */}
         <EnhancedTransactionDetails transaction={transaction} />
+
+        {/* Precompile Data Display for any transaction with precompile calls */}
+        {transaction && 
+         transaction.precompileAddress && 
+         transaction.precompileInput && (
+          <div className="mt-6">
+            <PrecompileDataDisplay 
+              precompileAddress={transaction.precompileAddress}
+              precompileInput={transaction.precompileInput}
+            />
+          </div>
+        )}
+
 
         {/* Transaction Flow Visualizations */}
         {transaction && transaction.type === RitualTransactionType.SCHEDULED && (

@@ -237,7 +237,7 @@ export default function TokenPage() {
                 <Link href="/" className="text-lime-300 hover:text-white px-3 py-2 text-sm font-medium transition-colors">Home</Link>
                 <Link href="/blocks" className="text-lime-300 hover:text-white px-3 py-2 text-sm font-medium transition-colors">Blocks</Link>
                 <Link href="/transactions" className="text-lime-300 hover:text-white px-3 py-2 text-sm font-medium transition-colors">Transactions</Link>
-                <Link href="/analytics" className="text-lime-300 hover:text-white px-3 py-2 text-sm font-medium transition-colors">Analytics</Link>
+                <Link href="/charts" className="text-lime-300 hover:text-white px-3 py-2 text-sm font-medium transition-colors">Analytics</Link>
                 <Link href="/settings" className="text-lime-300 hover:text-white px-3 py-2 text-sm font-medium transition-colors">Settings</Link>
               </nav>
             </div>

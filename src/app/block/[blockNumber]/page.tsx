@@ -91,9 +91,8 @@ export default function BlockDetailPage({ params }: PageProps) {
           total: blockData.transactions.length
         }
         
-        // If transactions are just hashes, we need to fetch details to get types
-        // For now, we'll make a reasonable assumption based on recent Ritual Chain data
-        for (const tx of blockData.transactions.slice(0, 10)) { // Sample first 10 for performance
+        // Process all transactions to count types accurately
+        for (const tx of blockData.transactions) {
           if (typeof tx === 'object' && tx.type) {
             const txType = tx.type
             switch (txType) {
@@ -160,6 +159,90 @@ export default function BlockDetailPage({ params }: PageProps) {
 
   const shortenHash = (hash: string) => {
     return `${hash.slice(0, 10)}...${hash.slice(-8)}`
+  }
+  
+  // Decode transaction method from input data
+  const getTransactionMethod = (tx: any): string => {
+    if (typeof tx === 'string') return 'Transfer' // Just a hash
+    
+    const input = tx.input || tx.data || '0x'
+    
+    // No input data = simple transfer
+    if (!input || input === '0x' || input.length < 10) {
+      return 'Transfer'
+    }
+    
+    // Get method selector (first 4 bytes = 0x + 8 hex chars)
+    const methodSelector = input.slice(0, 10).toLowerCase()
+    
+    // Common method signatures (first 4 bytes = method selector)
+    const methodSignatures: { [key: string]: string } = {
+      // ERC20 Methods
+      '0xa9059cbb': 'transfer',
+      '0x23b872dd': 'transferFrom',
+      '0x095ea7b3': 'approve',
+      '0x70a08231': 'balanceOf',
+      '0xdd62ed3e': 'allowance',
+      '0x18160ddd': 'totalSupply',
+      
+      // Minting/Burning
+      '0x40c10f19': 'mint',
+      '0x42966c68': 'burn',
+      '0x9dc29fac': 'burn',
+      
+      // ETH/WETH
+      '0xd0e30db0': 'deposit',
+      '0x2e1a7d4d': 'withdraw',
+      '0x3ccfd60b': 'withdraw',
+      
+      // Uniswap/DEX
+      '0x38ed1739': 'swapExactTokensForTokens',
+      '0x8803dbee': 'swapTokensForExactTokens',
+      '0x7ff36ab5': 'swapExactETHForTokens',
+      '0xfb3bdb41': 'swapETHForExactTokens',
+      '0xc45a0155': 'mint (Uniswap)',
+      '0xac9650d8': 'multicall',
+      
+      // Ritual RitualWallet (from ritual-sc-internal ABIs)
+      '0xb6b55f25': 'deposit',
+      '0x2f4f21e2': 'depositFor',
+      '0x0955f449': 'settleAsyncTransaction',
+      '0x5312ea8e': 'emergencyWithdraw',
+      '0x71265eac': 'refundGas',
+      '0xe33d3995': 'deductExecutionFees',
+      
+      // Ritual Scheduler
+      '0x434c659c': 'schedule',
+      '0x40e58ee5': 'cancel',
+      '0x5601eaea': 'execute',
+      '0x163e6b98': 'getCallState',
+      '0x786db84d': 'cleanupExpiredCalls',
+      '0xd183ce14': 'calls',
+      '0x05d35696': 'callToSlot',
+      
+      // Ritual AsyncJobTracker
+      '0xae252a36': 'addJob',
+      '0x8a1d7219': 'removeJob',
+      '0xf729cf0d': 'getJob',
+      '0x76fe2e62': 'getPendingJobs',
+      '0x6830cdc4': 'getJobCount',
+      '0x3e3cd2f7': 'cleanupExpiredJobs',
+      
+      // Ritual Precompile Consumer
+      '0xce37732b': 'callHTTPCall',
+      '0xb97caff7': 'callLLMInference',
+      '0xb658d4fa': 'callONNXInference',
+      '0x41d3f39a': 'callJQQuery',
+      '0xeb5f03e7': 'callED25519SigVer',
+      '0xcfd7e58d': 'callSECP256R1SigVer',
+      '0x075a750d': 'callHTTPWithJQ',
+      
+      // Fallback
+      '0x': 'Transfer'
+    }
+    
+    const methodName = methodSignatures[methodSelector]
+    return methodName || methodSelector // Return full selector if unknown
   }
 
   const calculateGasTarget = (gasUsed: string, gasLimit: string) => {
@@ -538,7 +621,7 @@ export default function BlockDetailPage({ params }: PageProps) {
               Transactions ({block.transactions.length})
             </h2>
             <div className="bg-white/5 border border-lime-500/20 rounded-lg divide-y divide-lime-500/10">
-              {block.transactions.slice(0, 10).map((tx: any, index: number) => (
+              {block.transactions.map((tx: any, index: number) => (
                 <div key={tx.hash || index} className="p-4 hover:bg-lime-500/5">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-4">
@@ -553,7 +636,7 @@ export default function BlockDetailPage({ params }: PageProps) {
                           {typeof tx === 'string' ? shortenHash(tx) : shortenHash(tx.hash || '')}
                         </Link>
                         <div className="text-lime-400 text-xs mt-1">
-                          Method: Transfer
+                          Method: {getTransactionMethod(tx)}
                         </div>
                       </div>
                     </div>

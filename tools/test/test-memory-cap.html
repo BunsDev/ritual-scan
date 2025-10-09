@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>25MB Page Window Memory Cap Test</title>
+  <style>
+    body { font-family: monospace; padding: 20px; background: #0a0a0a; color: #84cc16; }
+    .log { margin: 5px 0; }
+    .info { color: #84cc16; }
+    .warn { color: #fbbf24; }
+    .error { color: #ef4444; }
+    button { padding: 10px 20px; margin: 10px 5px 0 0; background: #84cc16; color: black; border: none; cursor: pointer; font-weight: bold; }
+    button:hover { background: #65a30d; }
+    #stats { margin-top: 20px; padding: 20px; background: #1a1a1a; border: 1px solid #84cc16; }
+  </style>
+</head>
+<body>
+  <h1>🧪 Per-Page Window 25MB Memory Cap Test</h1>
+  <p>This tests the new 25MB memory limit for per-page expanding windows.</p>
+  
+  <button onclick="runMemoryTest()">Run Memory Cap Test</button>
+  <button onclick="clearLogs()">Clear Logs</button>
+  
+  <div id="stats"></div>
+  <div id="logs"></div>
+
+  <script>
+    const logs = document.getElementById('logs');
+    const stats = document.getElementById('stats');
+    
+    function log(message, type = 'info') {
+      const div = document.createElement('div');
+      div.className = `log ${type}`;
+      div.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+      logs.appendChild(div);
+      logs.scrollTop = logs.scrollHeight;
+    }
+    
+    function clearLogs() {
+      logs.innerHTML = '';
+      stats.innerHTML = '';
+    }
+    
+    // Simulate the memory estimation logic
+    function estimateBlockSize(block) {
+      return JSON.stringify(block).length * 2; // UTF-16 = 2 bytes per char
+    }
+    
+    function estimateArraySize(blocks) {
+      if (blocks.length === 0) return 0;
+      const sampleSize = estimateBlockSize(blocks[0]);
+      return sampleSize * blocks.length;
+    }
+    
+    // Create a mock block with realistic size (~2KB)
+    function createMockBlock(blockNumber) {
+      return {
+        number: `0x${blockNumber.toString(16)}`,
+        hash: `0x${'a'.repeat(64)}`,
+        parentHash: `0x${'b'.repeat(64)}`,
+        miner: `0x${'c'.repeat(40)}`,
+        timestamp: `0x${Date.now().toString(16)}`,
+        gasLimit: '0x1c9c380',
+        gasUsed: '0x5208',
+        baseFeePerGas: '0x3b9aca00',
+        difficulty: '0x0',
+        totalDifficulty: '0x0',
+        extraData: '0x' + 'test'.repeat(50),
+        transactions: Array(10).fill(null).map((_, i) => ({
+          hash: `0x${'d'.repeat(64)}`,
+          from: `0x${'e'.repeat(40)}`,
+          to: `0x${'f'.repeat(40)}`,
+          value: '0x1234567890'
+        }))
+      };
+    }
+    
+    function runMemoryTest() {
+      log('🚀 Starting 25MB memory cap test...', 'info');
+      
+      const MAX_SIZE_MB = 25;
+      const MAX_SIZE_BYTES = MAX_SIZE_MB * 1024 * 1024;
+      
+      let pageWindow = [];
+      let blockNumber = 1000;
+      let trimmedCount = 0;
+      
+      // Add blocks until we hit the limit
+      log(`📊 Adding blocks until ${MAX_SIZE_MB}MB limit is reached...`, 'info');
+      
+      while (true) {
+        const newBlock = createMockBlock(blockNumber++);
+        pageWindow.unshift(newBlock); // Add to front
+        
+        let currentSize = estimateArraySize(pageWindow);
+        
+        // Enforce 25MB limit
+        while (currentSize > MAX_SIZE_BYTES && pageWindow.length > 10) {
+          pageWindow.pop(); // Remove oldest
+          trimmedCount++;
+          currentSize = estimateArraySize(pageWindow);
+        }
+        
+        const sizeMB = (currentSize / (1024 * 1024)).toFixed(2);
+        
+        if (trimmedCount > 0) {
+          log(`🗑️ Trimmed ${trimmedCount} oldest blocks - now at ${pageWindow.length} blocks (${sizeMB}MB)`, 'warn');
+          break;
+        }
+        
+        if (pageWindow.length % 100 === 0) {
+          log(`📦 Added ${pageWindow.length} blocks - size: ${sizeMB}MB`, 'info');
+        }
+        
+        // Safety limit to prevent infinite loop
+        if (pageWindow.length > 20000) {
+          log('⚠️ Safety limit reached (20,000 blocks)', 'warn');
+          break;
+        }
+      }
+      
+      const finalSize = estimateArraySize(pageWindow);
+      const finalSizeMB = (finalSize / (1024 * 1024)).toFixed(2);
+      
+      stats.innerHTML = `
+        <h2>📊 Test Results</h2>
+        <p><strong>Maximum Blocks Stored:</strong> ${pageWindow.length.toLocaleString()}</p>
+        <p><strong>Final Memory Size:</strong> ${finalSizeMB}MB</p>
+        <p><strong>Memory Limit:</strong> ${MAX_SIZE_MB}MB</p>
+        <p><strong>Blocks Trimmed:</strong> ${trimmedCount}</p>
+        <p><strong>Average Block Size:</strong> ~${(finalSize / pageWindow.length / 1024).toFixed(2)}KB</p>
+        <p><strong>Status:</strong> <span style="color: ${finalSizeMB <= MAX_SIZE_MB ? '#84cc16' : '#ef4444'}">
+          ${finalSizeMB <= MAX_SIZE_MB ? '✅ Within Limit' : '❌ Exceeded Limit'}
+        </span></p>
+      `;
+      
+      log(`✅ Test complete! Stored ${pageWindow.length} blocks in ${finalSizeMB}MB`, 'info');
+      log(`🎯 Auto-trimming kicked in at ${pageWindow.length + trimmedCount} blocks`, 'info');
+    }
+    
+    log('💡 Click "Run Memory Cap Test" to simulate the 25MB per-page limit', 'info');
+  </script>
+</body>
+</html>

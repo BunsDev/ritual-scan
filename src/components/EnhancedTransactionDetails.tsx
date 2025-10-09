@@ -3,6 +3,15 @@
 import Link from 'next/link'
 import { EnhancedTransaction, RitualTransactionType, rethClient } from '@/lib/reth-client'
 import { TransactionTypeBadge, SystemAccountBadge } from './TransactionTypeBadge'
+import { useState, useEffect } from 'react'
+import { decodePrecompileInput, formatPrecompileData } from '@/lib/precompile-decoder'
+
+// Copy to clipboard helper
+const copyToClipboard = (text: string) => {
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(text)
+  }
+}
 
 interface EnhancedTransactionDetailsProps {
   transaction: EnhancedTransaction
@@ -20,6 +29,27 @@ export function EnhancedTransactionDetails({ transaction }: EnhancedTransactionD
       return ritual.toFixed(6)
     } catch {
       return '0'
+    }
+  }
+
+  // Helper function to decode precompile input inline
+  const decodePrecompileInputInline = (precompileAddress: string, precompileInput: string) => {
+    try {
+      if (!precompileInput || precompileInput === '0x' || precompileInput.length < 10) {
+        return null
+      }
+
+      const result = decodePrecompileInput(precompileAddress, precompileInput)
+      
+      if (result.decoded) {
+        const formatted = formatPrecompileData(result.type, result.decoded)
+        return { data: formatted, probability: result.probability, type: result.type }
+      }
+      
+      return null
+    } catch (err) {
+      console.error('Error decoding precompile data inline:', err)
+      return null
     }
   }
 
@@ -126,21 +156,22 @@ export function EnhancedTransactionDetails({ transaction }: EnhancedTransactionD
           </>
         )}
 
+        {/* Precompile Address - show for any transaction type */}
+        {transaction.precompileAddress && (
+          <div className="flex items-center justify-between px-6 py-4">
+            <div className="flex items-center space-x-3 text-lime-400">
+              <span className="w-4 h-4">🔧</span>
+              <span className="text-sm font-medium">Precompile Address:</span>
+            </div>
+            <Link href={`/address/${transaction.precompileAddress}`} className="text-lime-300 hover:text-white font-mono text-sm">
+              {transaction.precompileAddress}
+            </Link>
+          </div>
+        )}
+
         {transaction.type === RitualTransactionType.ASYNC_COMMITMENT && (
           <>
             {/* AsyncCommitment Fields */}
-            {transaction.precompileAddress && (
-              <div className="flex items-center justify-between px-6 py-4">
-                <div className="flex items-center space-x-3 text-lime-400">
-                  <span className="w-4 h-4">🔧</span>
-                  <span className="text-sm font-medium">Precompile Address:</span>
-                </div>
-                <Link href={`/address/${transaction.precompileAddress}`} className="text-lime-300 hover:text-white font-mono text-sm">
-                  {transaction.precompileAddress}
-                </Link>
-              </div>
-            )}
-
             {transaction.executorAddress && (
               <div className="flex items-center justify-between px-6 py-4">
                 <div className="flex items-center space-x-3 text-lime-400">
@@ -225,7 +256,7 @@ export function EnhancedTransactionDetails({ transaction }: EnhancedTransactionD
             <div className="space-y-4">
               {transaction.spcCalls.map((call, index) => (
                 <div key={index} className="bg-black/30 rounded-lg p-4 border border-lime-500/10">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm mb-4">
                     <div>
                       <div className="text-lime-400">Precompile Address:</div>
                       <Link href={`/address/${call.address}`} className="text-lime-300 hover:text-white font-mono break-all">
@@ -247,6 +278,52 @@ export function EnhancedTransactionDetails({ transaction }: EnhancedTransactionD
                       <div className="text-white">{call.programCounter}</div>
                     </div>
                   </div>
+                  
+                  {/* Decoded Precompile Input */}
+                  {call.input && (() => {
+                    const decodedResult = decodePrecompileInputInline(call.address, call.input)
+                    if (!decodedResult) return null
+                    
+                    return (
+                      <div className="mt-4 pt-4 border-t border-lime-500/10">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="text-lime-400 text-sm font-medium">Decoded Precompile Input</div>
+                          {decodedResult.probability < 1.0 && (
+                            <div className="text-xs text-yellow-400">
+                              Confidence: {(decodedResult.probability * 100).toFixed(0)}%
+                            </div>
+                          )}
+                        </div>
+                        
+                        <div className="space-y-3">
+                          {Object.entries(decodedResult.data).map(([key, value]) => (
+                            <div key={key} className="flex flex-col space-y-1">
+                              <div className="text-lime-400 text-sm font-medium">{key}:</div>
+                              <div className="relative group">
+                                <div className="text-white text-sm bg-black/30 rounded p-2 pr-12 break-all whitespace-pre-wrap font-mono">
+                                  {typeof value === 'string' && value.startsWith('0x') && value.length === 42 ? (
+                                    <Link href={`/address/${value}`} className="text-lime-300 hover:text-white">
+                                      {value}
+                                    </Link>
+                                  ) : (
+                                    String(value)
+                                  )}
+                                </div>
+                                {/* Copy button */}
+                                <button
+                                  onClick={() => copyToClipboard(String(value))}
+                                  className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity bg-lime-500/20 hover:bg-lime-500/30 text-lime-300 px-2 py-1 rounded text-xs"
+                                  title="Copy to clipboard"
+                                >
+                                  Copy
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )
+                  })()}
                 </div>
               ))}
             </div>

@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>HTTPS Proxy Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        .test-result { margin: 10px 0; padding: 10px; border-radius: 5px; }
+        .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        button { margin: 5px; padding: 10px 20px; cursor: pointer; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 5px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>🔒 HTTPS Proxy Test</h1>
+    
+    <div class="info">
+        <strong>Protocol:</strong> <span id="protocol"></span><br>
+        <strong>Host:</strong> <span id="host"></span>
+    </div>
+    
+    <h2>RPC Proxy Test</h2>
+    <button onclick="testRpcProxy()">Test RPC Proxy</button>
+    <div id="rpc-result"></div>
+    
+    <h2>WebSocket Test</h2>
+    <button onclick="testWebSocket()">Test WebSocket Connection</button>
+    <button onclick="disconnectWebSocket()">Disconnect</button>
+    <div id="ws-result"></div>
+    
+    <h2>Smart Cache Test</h2>
+    <button onclick="testSmartCache()">Test Smart Cache</button>
+    <div id="cache-result"></div>
+    
+    <script>
+        // Display current protocol and host
+        document.getElementById('protocol').textContent = window.location.protocol;
+        document.getElementById('host').textContent = window.location.host;
+        
+        let ws = null;
+        
+        // Test RPC Proxy
+        async function testRpcProxy() {
+            const resultDiv = document.getElementById('rpc-result');
+            resultDiv.innerHTML = '<div class="info">Testing RPC proxy...</div>';
+            
+            try {
+                const response = await fetch('/api/rpc-proxy', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        jsonrpc: '2.0',
+                        method: 'eth_blockNumber',
+                        params: [],
+                        id: Date.now()
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.result) {
+                    const blockNumber = parseInt(data.result, 16);
+                    resultDiv.innerHTML = `
+                        <div class="success">✅ RPC Proxy Working!</div>
+                        <pre>Block Number: ${blockNumber} (${data.result})</pre>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `<div class="error">❌ RPC Error: ${JSON.stringify(data.error)}</div>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ Network Error: ${error.message}</div>`;
+            }
+        }
+        
+        // Test WebSocket Connection
+        function testWebSocket() {
+            const resultDiv = document.getElementById('ws-result');
+            
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                resultDiv.innerHTML = '<div class="info">WebSocket already connected</div>';
+                return;
+            }
+            
+            resultDiv.innerHTML = '<div class="info">Connecting to WebSocket...</div>';
+            
+            // Determine WebSocket URL based on protocol
+            const isHttps = window.location.protocol === 'https:';
+            const wsProtocol = isHttps ? 'wss:' : 'ws:';
+            const wsUrl = isHttps ? 
+                `${wsProtocol}//${window.location.host}/api/ws-proxy?id=test_${Date.now()}` :
+                'ws://35.196.101.134:8546';
+            
+            console.log('WebSocket URL:', wsUrl);
+            
+            try {
+                ws = new WebSocket(wsUrl);
+                
+                ws.onopen = () => {
+                    resultDiv.innerHTML = `
+                        <div class="success">✅ WebSocket Connected!</div>
+                        <pre>URL: ${wsUrl}</pre>
+                    `;
+                    
+                    // Send a test subscription
+                    const subscription = {
+                        jsonrpc: '2.0',
+                        method: 'eth_subscribe',
+                        params: ['newHeads'],
+                        id: 1
+                    };
+                    ws.send(JSON.stringify(subscription));
+                };
+                
+                ws.onmessage = (event) => {
+                    const message = JSON.parse(event.data);
+                    const messagePreview = JSON.stringify(message, null, 2).slice(0, 200);
+                    
+                    resultDiv.innerHTML += `
+                        <div class="info">📩 Message Received</div>
+                        <pre>${messagePreview}${messagePreview.length >= 200 ? '...' : ''}</pre>
+                    `;
+                };
+                
+                ws.onerror = (error) => {
+                    resultDiv.innerHTML += `<div class="error">❌ WebSocket Error</div>`;
+                    console.error('WebSocket error:', error);
+                };
+                
+                ws.onclose = (event) => {
+                    resultDiv.innerHTML += `
+                        <div class="info">🔌 WebSocket Closed (Code: ${event.code})</div>
+                    `;
+                };
+                
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ WebSocket Creation Failed: ${error.message}</div>`;
+            }
+        }
+        
+        function disconnectWebSocket() {
+            if (ws) {
+                ws.close();
+                ws = null;
+            }
+        }
+        
+        // Test Smart Cache
+        async function testSmartCache() {
+            const resultDiv = document.getElementById('cache-result');
+            resultDiv.innerHTML = '<div class="info">Testing smart cache...</div>';
+            
+            try {
+                // Try to access the global debug function
+                if (typeof window.debugWebSocketCache === 'function') {
+                    const cacheState = window.debugWebSocketCache();
+                    resultDiv.innerHTML = `
+                        <div class="success">✅ Smart Cache Debug Available</div>
+                        <pre>${JSON.stringify(cacheState, null, 2)}</pre>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="error">❌ Smart Cache Debug Function Not Available</div>
+                        <div class="info">The page might need to load first or WebSocket manager not initialized</div>
+                    `;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ Error: ${error.message}</div>`;
+            }
+        }
+        
+        // Auto-run some tests when page loads
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                testRpcProxy();
+            }, 1000);
+        });
+    </script>
+</body>
+</html>

@@ -8,17 +8,18 @@
 
 // Known deployed contract addresses (from genesis/early blocks)
 export const DEPLOYED_CONTRACTS = {
-  // Core system contracts (deployed at genesis)
-  ASYNC_PRECOMPILE: '0x0000000000000000000000000000000000000801',
+  // Precompile addresses (fixed addresses)
+  ONNX_PRECOMPILE: '0x0000000000000000000000000000000000000800',       // ONNX inference
+  HTTP_CALL_PRECOMPILE: '0x0000000000000000000000000000000000000801',  // HTTP call
+  LLM_CALL_PRECOMPILE: '0x0000000000000000000000000000000000000802',   // LLM call
+  JQ_QUERY_PRECOMPILE: '0x0000000000000000000000000000000000000803',   // JQ Query
+  ED25519_SIGVER_PRECOMPILE: '0x0000000000000000000000000000000000000009', // ED25519 signature verification
+  SECP256R1_SIGVER_PRECOMPILE: '0x0000000000000000000000000000000000000100', // SECP256R1 signature verification
+  NITRO_VERIFICATION_PRECOMPILE: '0x0000000000000000000000000000000000000101', // Nitro verification
   
-  // Scheduler and RitualWallet (deployed at block 0-1)
-  // TODO: Need to query genesis block to find actual deployment addresses
-  SCHEDULER_CONTRACT: '0x0000000000000000000000000000000000001000', // Placeholder - find in genesis
-  RITUAL_WALLET: '0x0000000000000000000000000000000000002000', // Placeholder - find in genesis
-  
-  // Additional precompiles that may be deployed
-  INFERENCE_PRECOMPILE: '0x0000000000000000000000000000000000000802', // ONNX inference
-  VALIDATION_PRECOMPILE: '0x0000000000000000000000000000000000000803', // Proof validation
+  // Core system contracts (deployed at genesis/block 0-1)
+  SCHEDULER_CONTRACT: '0x0000000000000000000000000000000000001000',
+  RITUAL_WALLET: '0x0000000000000000000000000000000000002000',
 } as const
 
 // ABI definitions for contract decoding
@@ -162,8 +163,8 @@ export const CONTRACT_ABIS = {
     }
   ],
 
-  // ONNX Inference Precompile ABI
-  INFERENCE_PRECOMPILE: [
+  // ONNX Inference Precompile ABI (0x800)
+  ONNX_PRECOMPILE: [
     {
       "type": "function",
       "name": "runInference",
@@ -183,6 +184,49 @@ export const CONTRACT_ABIS = {
         {"name": "gasUsed", "type": "uint256", "indexed": false},
         {"name": "success", "type": "bool", "indexed": false}
       ]
+    }
+  ],
+
+  // HTTP Call Precompile ABI (0x801)
+  HTTP_CALL_PRECOMPILE: [
+    {
+      "type": "function",
+      "name": "httpCall",
+      "inputs": [
+        {"name": "url", "type": "string"},
+        {"name": "method", "type": "uint8"},
+        {"name": "headers", "type": "string[]"},
+        {"name": "body", "type": "bytes"}
+      ],
+      "outputs": [{"name": "response", "type": "bytes"}]
+    }
+  ],
+
+  // LLM Call Precompile ABI (0x802)
+  LLM_CALL_PRECOMPILE: [
+    {
+      "type": "function",
+      "name": "llmCall",
+      "inputs": [
+        {"name": "model", "type": "string"},
+        {"name": "messages", "type": "string"},
+        {"name": "temperature", "type": "uint256"},
+        {"name": "maxTokens", "type": "uint256"}
+      ],
+      "outputs": [{"name": "response", "type": "string"}]
+    }
+  ],
+
+  // JQ Query Precompile ABI (0x803)
+  JQ_QUERY_PRECOMPILE: [
+    {
+      "type": "function",
+      "name": "jqQuery",
+      "inputs": [
+        {"name": "jsonData", "type": "string"},
+        {"name": "query", "type": "string"}
+      ],
+      "outputs": [{"name": "result", "type": "string"}]
     }
   ]
 } as const

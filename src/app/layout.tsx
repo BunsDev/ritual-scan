@@ -4,8 +4,8 @@ import "./globals.css";
 import { Providers } from "@/components/providers";
 import { Toaster } from "@/components/ui/sonner";
 import { BackgroundAudio } from "@/components/BackgroundAudio";
-import { PerformanceMonitor } from "@/components/PerformanceMonitor";
 import { ParticleToggleSimple } from "@/components/ParticleToggleSimple";
+import { WagmiProviderWrapper } from "@/components/WagmiProviderWrapper";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -76,17 +76,18 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning className="bg-black">
       <body
-        className={`${inter.variable} ${jetbrainsMono.variable} font-sans antialiased`}
+        className={`${inter.variable} ${jetbrainsMono.variable} font-sans antialiased bg-black`}
       >
-        <Providers>
-          {children}
-          <BackgroundAudio />
-          <PerformanceMonitor />
-          <ParticleToggleSimple />
-          <Toaster />
-        </Providers>
+        <WagmiProviderWrapper>
+          <Providers>
+            {children}
+            <BackgroundAudio />
+            <ParticleToggleSimple />
+            <Toaster />
+          </Providers>
+        </WagmiProviderWrapper>
       </body>
     </html>
   );

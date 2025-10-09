@@ -383,14 +383,6 @@ function ProductionEventCard({ event, compact }: { event: any, compact: boolean 
           )}
 
           {/* Real-time detection status */}
-          <div className="col-span-2 bg-lime-500/10 rounded p-2 border border-lime-500/20">
-            <span className="text-lime-400 text-xs font-medium">Real-time Detection: </span>
-            {event.status === '✅ ACTIVE' ? (
-              <span className="text-green-300 text-xs">Using production keccak256 signatures for live event parsing</span>
-            ) : (
-              <span className="text-yellow-300 text-xs">Ready for activation once contract is deployed</span>
-            )}
-          </div>
 
           {/* Enhanced debug information */}
           <div className="col-span-2">

@@ -132,7 +132,7 @@ export class RitualEventParserProduction {
             color: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30'
           }
           // Add precompile type identification
-          ;(eventData as any).precompileType = this.identifyPrecompileFromData(log.data)
+          ;(eventData as any).precompileType = this.identifyPrecompileFromLog(log)
         } else if (topic0 === REAL_EVENT_SIGNATURES.PRECOMPILE_FAILED) {
           eventData = {
             eventType: 'PrecompileFailed',
@@ -586,15 +586,61 @@ export class RitualEventParserProduction {
   }
 
   /**
-   * Identify precompile type from address in log data
+   * Identify precompile type from log structure
+   * Properly extracts and checks the precompile address from event data
    */
-  private static identifyPrecompileFromData(data: string): string {
-    // Basic precompile identification - could be enhanced with ABI decoding
-    if (data.includes('0800')) return 'ONNX Inference'
-    if (data.includes('0801')) return 'HTTP Call'
-    if (data.includes('0803')) return 'JQ Query'
-    if (data.includes('0009')) return 'ED25519 Signature'
-    if (data.includes('0100')) return 'SECP256R1 Signature'
+  private static identifyPrecompileFromLog(log: any): string {
+    // Check topics first (indexed parameters)
+    if (log.topics && log.topics.length > 1) {
+      for (const topic of log.topics.slice(1)) { // Skip topic[0] which is event signature
+        const address = '0x' + topic.slice(-40) // Get last 20 bytes (40 hex chars) for address
+        if (this.matchPrecompileAddress(address)) {
+          return this.getPrecompileTypeName(address)
+        }
+      }
+    }
+    
+    // Check data field - addresses are 32-byte aligned (64 hex chars)
+    if (log.data && log.data.length >= 66) { // 0x + at least 64 chars
+      const cleanData = log.data.startsWith('0x') ? log.data.slice(2) : log.data
+      
+      // Try to extract address from first 32 bytes
+      for (let i = 0; i < Math.min(cleanData.length / 64, 5); i++) {
+        const chunk = cleanData.slice(i * 64, (i + 1) * 64)
+        if (chunk.length === 64) {
+          const address = '0x' + chunk.slice(-40) // Get last 20 bytes
+          if (this.matchPrecompileAddress(address)) {
+            return this.getPrecompileTypeName(address)
+          }
+        }
+      }
+    }
+    
+    return 'Precompile Call'
+  }
+  
+  /**
+   * Check if address matches a known precompile
+   */
+  private static matchPrecompileAddress(address: string): boolean {
+    const addr = address.toLowerCase()
+    return addr === RITUAL_CONTRACT_ADDRESSES.ONNX_INFERENCE_PRECOMPILE.toLowerCase() ||
+           addr === RITUAL_CONTRACT_ADDRESSES.HTTP_CALL_PRECOMPILE.toLowerCase() ||
+           addr === RITUAL_CONTRACT_ADDRESSES.JQ_QUERY_PRECOMPILE.toLowerCase() ||
+           addr === RITUAL_CONTRACT_ADDRESSES.ED25519_SIG_VER_PRECOMPILE.toLowerCase() ||
+           addr === RITUAL_CONTRACT_ADDRESSES.SECP256R1_SIG_VER_PRECOMPILE.toLowerCase()
+  }
+  
+  /**
+   * Get precompile type name from address
+   */
+  private static getPrecompileTypeName(address: string): string {
+    const addr = address.toLowerCase()
+    if (addr === RITUAL_CONTRACT_ADDRESSES.ONNX_INFERENCE_PRECOMPILE.toLowerCase()) return 'ONNX Inference'
+    if (addr === RITUAL_CONTRACT_ADDRESSES.HTTP_CALL_PRECOMPILE.toLowerCase()) return 'HTTP Call'
+    if (addr === RITUAL_CONTRACT_ADDRESSES.JQ_QUERY_PRECOMPILE.toLowerCase()) return 'JQ Query'
+    if (addr === RITUAL_CONTRACT_ADDRESSES.ED25519_SIG_VER_PRECOMPILE.toLowerCase()) return 'ED25519 Signature'
+    if (addr === RITUAL_CONTRACT_ADDRESSES.SECP256R1_SIG_VER_PRECOMPILE.toLowerCase()) return 'SECP256R1 Signature'
     return 'Precompile Call'
   }
 }

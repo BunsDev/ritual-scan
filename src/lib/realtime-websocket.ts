@@ -3,15 +3,33 @@
 import { rethClient } from './reth-client'
 
 export interface RealtimeUpdate {
-  type: 'newBlock' | 'newTransaction' | 'newPendingTransaction' | 'gasPriceUpdate' | 'mempoolUpdate' | 'scheduledUpdate'
+  type: 'newBlock' | 'newTransaction' | 'newPendingTransaction' | 'gasPriceUpdate' | 'mempoolUpdate' | 'scheduledUpdate' | 'validatorPeersUpdate'
   data: any
   timestamp: number
 }
 
 export type UpdateCallback = (update: RealtimeUpdate) => void
 
+// Debug mode - set to false for production
+const DEBUG_MODE = false
+
+// Cache size limits
+const MAX_GLOBAL_CACHE_BLOCKS = 500  // Shared across all pages (rolling window)
+const MAX_PAGE_WINDOW_BLOCKS = 1000  // Per-page expanding window limit
+
 class RealtimeWebSocketManager {
   private ws: WebSocket | null = null
+  // Smart caching for instant page loads (ROLLING WINDOW - max 500 blocks)
+  private recentBlocksCache: any[] = []
+  private recentTransactionsCache: any[] = []
+  private latestMempoolStats: any = {}
+  private latestScheduledTxs: any[] = []
+  private latestAsyncCommitments: any[] = []
+  private validatorPeers: any[] = []
+  private validatorPeersLastUpdate: number = 0
+  private validatorPeersPollInterval: number = 60000 // Start with 1 minute
+  // Per-page expanding windows (CAPPED at 1000 blocks per page - persists while user stays on page)
+  private pageBlockWindows: Map<string, any[]> = new Map()
   private reconnectAttemps = 0
   private maxReconnectAttempts = 10
   private reconnectInterval = 1000 // Start with 1 second
@@ -23,12 +41,165 @@ class RealtimeWebSocketManager {
   private lastTransactionHashes = new Set<string>()
   private mempoolCheckInterval: NodeJS.Timeout | null = null
   private blockCheckInterval: NodeJS.Timeout | null = null
+  private validatorPeersInterval: NodeJS.Timeout | null = null
+  private lastLocalStorageSave: number = 0
+  private pendingStorageSave: NodeJS.Timeout | null = null
+  
+  private log(...args: any[]) {
+    if (DEBUG_MODE) console.log(...args)
+  }
+  
+  private logImportant(...args: any[]) {
+    // Always log important events (errors, connections)
+    console.log(...args)
+  }
 
   constructor() {
     if (typeof window !== 'undefined') {
       this.connectionId = `conn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+      
+      this.logImportant(`🚀 [${this.connectionId}] WebSocket manager starting...`)
+      
+      // Try to restore cache from localStorage (survives page refresh)
+      this.restoreCacheFromStorage()
+      
+      // START IMMEDIATELY - cache builds in background regardless of page
       this.startConnection()
       this.startHighFrequencyPolling()
+    }
+  }
+  
+  private restoreCacheFromStorage() {
+    try {
+      // Check if we should skip restoration (RPC config change in progress)
+      const skipRestore = sessionStorage.getItem('ritual-scan-skip-cache-restore')
+      if (skipRestore === 'true') {
+        console.log(`🚫 [${this.connectionId}] Skipping cache restore - RPC config changed`)
+        sessionStorage.removeItem('ritual-scan-skip-cache-restore')
+        return
+      }
+      
+      // Restore global cache
+      const stored = localStorage.getItem('ritual-scan-cache')
+      if (stored) {
+        const data = JSON.parse(stored)
+        const age = Date.now() - data.timestamp
+        
+        // Use cache if less than 30 seconds old
+        if (age < 30000 && data.blocks && Array.isArray(data.blocks)) {
+          this.recentBlocksCache = data.blocks
+          this.log(`💾 [${this.connectionId}] Restored ${data.blocks.length} blocks from localStorage (age: ${(age/1000).toFixed(1)}s)`)
+        } else {
+          this.log(`⏰ [${this.connectionId}] localStorage cache too old (${(age/1000).toFixed(1)}s), discarding`)
+        }
+      }
+      
+      // Restore validator peers (longer TTL since they change slowly)
+      const validatorPeersStored = localStorage.getItem('ritual-scan-validator-peers')
+      if (validatorPeersStored) {
+        const data = JSON.parse(validatorPeersStored)
+        const age = Date.now() - data.timestamp
+        
+        // Use validator peers if less than 10 minutes old
+        if (age < 600000 && data.peers && Array.isArray(data.peers)) {
+          this.validatorPeers = data.peers
+          this.validatorPeersLastUpdate = data.timestamp
+          this.logImportant(`💾 [${this.connectionId}] Restored ${data.peers.length} validator peers from localStorage (age: ${(age/1000).toFixed(1)}s)`)
+        } else {
+          this.log(`⏰ [${this.connectionId}] Validator peers cache too old (${(age/1000).toFixed(1)}s), discarding`)
+        }
+      }
+      
+      // Restore per-page windows
+      const pageWindowsStored = localStorage.getItem('ritual-scan-page-windows')
+      if (pageWindowsStored) {
+        const data = JSON.parse(pageWindowsStored)
+        const age = Date.now() - data.timestamp
+        
+        // Use page windows if less than 5 minutes old (more generous than global cache)
+        if (age < 300000 && data.windows) {
+          let totalBlocks = 0
+          Object.entries(data.windows).forEach(([pageId, blocks]: [string, any]) => {
+            if (Array.isArray(blocks) && blocks.length > 0) {
+              this.pageBlockWindows.set(pageId, blocks)
+              totalBlocks += blocks.length
+              this.log(`💾 [${this.connectionId}] Restored ${blocks.length} blocks for page '${pageId}'`)
+            }
+          })
+          this.logImportant(`💾 [${this.connectionId}] Restored ${this.pageBlockWindows.size} page windows with ${totalBlocks} total blocks (age: ${(age/1000).toFixed(1)}s)`)
+        } else {
+          this.log(`⏰ [${this.connectionId}] Page windows cache too old (${(age/1000).toFixed(1)}s), discarding`)
+        }
+      }
+    } catch (error) {
+      console.warn(`⚠️  [${this.connectionId}] Failed to restore cache from localStorage:`, error)
+    }
+  }
+  
+  private saveCacheToStorage() {
+    // Debounce: Only save once every 5 seconds to avoid blocking main thread
+    const now = Date.now()
+    if (now - this.lastLocalStorageSave < 5000) {
+      // Schedule save for later if not already scheduled
+      if (!this.pendingStorageSave) {
+        this.pendingStorageSave = setTimeout(() => {
+          this.pendingStorageSave = null
+          this.saveCacheToStorageNow()
+        }, 5000 - (now - this.lastLocalStorageSave))
+      }
+      return
+    }
+    
+    this.saveCacheToStorageNow()
+  }
+  
+  private saveCacheToStorageNow() {
+    try {
+      // Save global cache
+      if (this.recentBlocksCache.length > 0) {
+        const data = {
+          blocks: this.recentBlocksCache,
+          timestamp: Date.now()
+        }
+        localStorage.setItem('ritual-scan-cache', JSON.stringify(data))
+        this.lastLocalStorageSave = Date.now()
+      }
+      
+      // Save validator peers (separate from blocks cache, never evicted)
+      if (this.validatorPeers.length > 0) {
+        const peersData = {
+          peers: this.validatorPeers,
+          timestamp: this.validatorPeersLastUpdate || Date.now()
+        }
+        localStorage.setItem('ritual-scan-validator-peers', JSON.stringify(peersData))
+        this.log(`💾 [${this.connectionId}] Saved ${this.validatorPeers.length} validator peers to localStorage`)
+      }
+      
+      // Save per-page windows
+      if (this.pageBlockWindows.size > 0) {
+        const windows: { [pageId: string]: any[] } = {}
+        this.pageBlockWindows.forEach((blocks, pageId) => {
+          windows[pageId] = blocks
+        })
+        
+        const pageWindowsData = {
+          windows,
+          timestamp: Date.now()
+        }
+        localStorage.setItem('ritual-scan-page-windows', JSON.stringify(pageWindowsData))
+        
+        // Calculate total size for logging
+        const totalSize = JSON.stringify(pageWindowsData).length
+        const sizeMB = (totalSize / (1024 * 1024)).toFixed(2)
+        this.log(`💾 [${this.connectionId}] Saved ${this.pageBlockWindows.size} page windows (${sizeMB}MB)`)
+      }
+    } catch (error) {
+      // Silently fail - localStorage might be full or disabled
+      if (error instanceof DOMException && error.name === 'QuotaExceededError') {
+        console.warn(`⚠️  [${this.connectionId}] localStorage quota exceeded - clearing old data`)
+        // Clear old data to make room
+        localStorage.removeItem('ritual-scan-page-windows')
+      }
     }
   }
 
@@ -38,20 +209,63 @@ class RealtimeWebSocketManager {
     }
 
     try {
-      // Try WebSocket connection to RETH node
-      const wsUrl = 'ws://104.196.32.199:8546'
-      console.log(`🔗 [${this.connectionId}] Attempting WebSocket connection to: ${wsUrl}`)
+      // Get WebSocket URL from rethClient (respects user settings!)
+      const dynamicWsUrl = rethClient.getConfiguration().websocket
+      
+      // Determine WebSocket URL based on environment
+      const isBrowser = typeof window !== 'undefined'
+      const isHttps = isBrowser && window.location.protocol === 'https:'
+      const host = isBrowser ? window.location.host : ''
+      
+      let wsUrl: string
+      if (isBrowser && isHttps) {
+        // HTTPS deployment - Cloudflare or local Caddy
+        if (host.includes('localhost')) {
+          // Local: wss://localhost/rpc-ws (Caddy path-based proxy)
+          wsUrl = `wss://${host}/rpc-ws`
+          this.logImportant(`🔗 [${this.connectionId}] Local HTTPS - Caddy proxy: ${wsUrl}`)
+        } else {
+          // Production HTTPS with Cloudflare
+          if (host.includes('ding.fish')) {
+            // Check if user has custom WebSocket URL (overrides default tunnel)
+            if (dynamicWsUrl && dynamicWsUrl !== 'ws://104.196.102.16:8546') {
+              // User customized - use their URL (convert to wss://)
+              wsUrl = dynamicWsUrl.replace('ws://', 'wss://')
+              this.logImportant(`🔗 [${this.connectionId}] Custom WebSocket (user settings): ${wsUrl}`)
+            } else {
+              // Default - use Cloudflare Tunnel
+              wsUrl = 'wss://ws.ding.fish/'
+              this.logImportant(`🔗 [${this.connectionId}] Cloudflare Tunnel - WebSocket: ${wsUrl}`)
+            }
+          } else {
+            // Other HTTPS sites - use dynamic config or fallback
+            const baseUrl = dynamicWsUrl || process.env.NEXT_PUBLIC_RETH_WS_URL || 'ws://104.196.102.16:8546'
+            wsUrl = baseUrl.replace('ws://', 'wss://')
+            this.logImportant(`🔗 [${this.connectionId}] HTTPS - Secure WebSocket: ${wsUrl}`)
+          }
+        }
+      } else {
+        // HTTP deployment - use dynamic config or fallback
+        wsUrl = dynamicWsUrl || process.env.NEXT_PUBLIC_RETH_WS_URL || 'ws://104.196.102.16:8546'
+        this.log(`🔗 [${this.connectionId}] HTTP - WebSocket from config: ${wsUrl}`)
+      }
       
       this.ws = new WebSocket(wsUrl)
       
       this.ws.onopen = () => {
-        console.log(`✅ [${this.connectionId}] WebSocket connected`)
         this.isConnected = true
         this.reconnectAttemps = 0
         this.reconnectInterval = 1000
         
         // Subscribe to new block headers (transactions will be extracted from blocks)
         this.subscribeToBlocks()
+        
+        // Trigger initial cache population for pages already loaded
+        setTimeout(() => {
+          this.forceRefresh('blocks')
+          this.forceRefresh('mempool')
+          this.forceRefresh('scheduled')
+        }, 1000) // Give subscriptions time to establish
       }
 
       this.ws.onmessage = (event) => {
@@ -61,7 +275,7 @@ class RealtimeWebSocketManager {
         } catch (error) {
           // Only log JSON parse errors if they're not related to RETH optimized mode responses
           if (event.data && event.data.includes('not supported in optimized mode')) {
-            console.log(`📡 [${this.connectionId}] RETH optimized mode response (expected)`)
+            this.log(`📡 [${this.connectionId}] RETH optimized mode response (expected)`)
           } else {
             console.error(`❌ [${this.connectionId}] WebSocket JSON parse error:`, error)
             console.error(`❌ [${this.connectionId}] Raw message that failed:`, event.data)
@@ -70,13 +284,18 @@ class RealtimeWebSocketManager {
       }
  
       this.ws.onclose = (event) => {
-        console.log(`🔌 [${this.connectionId}] WebSocket disconnected:`, event.code, event.reason)
+        // Only log unexpected closures (not normal disconnects)
+        if (event.code !== 1000 && event.code !== 1001) {
+          console.log(`WebSocket disconnected (code: ${event.code})`)
+        }
         this.isConnected = false
         this.scheduleReconnect()
       }
 
       this.ws.onerror = (error) => {
-        console.error(`⚠️ [${this.connectionId}] WebSocket error:`, error)
+        // WebSocket errors in browsers are often empty objects for security reasons
+        // We have polling fallbacks, so this is not critical
+        console.log(`⚠️ [${this.connectionId}] WebSocket connection failed - falling back to polling`)
         this.isConnected = false
       }
 
@@ -106,7 +325,7 @@ class RealtimeWebSocketManager {
         id: 2
       }
 
-      console.log(`📡 [${this.connectionId}] Subscribing to new block headers and pending transactions`)
+      this.log(`📡 [${this.connectionId}] Subscribing to new block headers and pending transactions`)
       this.ws.send(JSON.stringify(blockSubscription))
       this.ws.send(JSON.stringify(pendingTxSubscription))
     } catch (error) {
@@ -123,7 +342,7 @@ class RealtimeWebSocketManager {
       const error = message.params.error
       if (error.message?.includes('not supported in optimized mode')) {
         // This is expected - RETH optimized mode doesn't support some subscriptions 
-        console.log(`📡 [${this.connectionId}] RETH optimized mode - subscription not supported (expected)`)
+        this.log(`📡 [${this.connectionId}] RETH optimized mode - subscription not supported (expected)`)
         return
       }
       console.warn(`⚠️ [${this.connectionId}] Subscription error:`, error)
@@ -133,7 +352,7 @@ class RealtimeWebSocketManager {
     // Handle JSON-RPC errors
     if (message.error) {
       if (message.error.message?.includes('not supported in optimized mode')) {
-        console.log(`📡 [${this.connectionId}] RETH optimized mode - method not supported (expected)`)
+        this.log(`📡 [${this.connectionId}] RETH optimized mode - method not supported (expected)`)
         return
       }
       console.warn(`⚠️ [${this.connectionId}] RPC error:`, message.error)
@@ -143,92 +362,149 @@ class RealtimeWebSocketManager {
     if (message.method === 'eth_subscription') {
       const subscription = message.params?.subscription
       const result = message.params?.result
-
+      
       if (!subscription) {
         console.warn(`⚠️ [${this.connectionId}] Subscription message without subscription ID:`, message)
         return
       }
 
-      if (result && result.number) {
+      // Check if this is a block header (multiple ways to identify it)
+      const isBlockHeader = result && typeof result === 'object' && (
+        result.number ||            // Standard field
+        result.blockNumber ||       // Alternative field name
+        result.hash ||              // All blocks have hash
+        result.parentHash ||        // All blocks have parent hash
+        result.miner ||             // Blocks have miner
+        result.difficulty !== undefined  // Blocks have difficulty
+      )
+
+      if (isBlockHeader) {
         // This is a block header from newHeads subscription
         this.handleNewBlock(result)
       } else if (typeof result === 'string' && result.startsWith('0x')) {
         // This is a pending transaction hash
         this.handleNewPendingTransaction(result)
       } else {
-        console.log(`📩 [${this.connectionId}] Unknown subscription result:`, result)
+        // Only log unknown messages for debugging
+        this.log(`📩 [${this.connectionId}] Unknown subscription result:`, result ? Object.keys(result) : 'null')
       }
     } else if (message.id && message.result) {
-      console.log(`📩 [${this.connectionId}] Subscription confirmed:`, message.result)
+      this.log(`📩 [${this.connectionId}] Subscription confirmed:`, message.result)
     } else if (message.id && message.error) {
       console.warn(`⚠️ [${this.connectionId}] RPC method error:`, message.error)
       // If subscriptions are not supported, fall back to polling only
       if (message.error.message?.includes('not supported')) {
-        console.log(`📡 [${this.connectionId}] WebSocket subscriptions not supported, using polling only`)
+        this.log(`📡 [${this.connectionId}] WebSocket subscriptions not supported, using polling only`)
       }
     } else {
-      console.log(`📩 [${this.connectionId}] Unhandled message:`, message)
+      this.log(`📩 [${this.connectionId}] Unhandled message:`, message)
     }
   }
 
   private async handleNewBlock(blockHeader: any) {
-    const blockNumber = parseInt(blockHeader.number, 16)
-    
-    if (blockNumber > this.lastBlockNumber) {
-      console.log(`🔗 [${this.connectionId}] New block #${blockNumber}`)
-      this.lastBlockNumber = blockNumber
-
-      // Enhanced block update with gas price (Tier 1 feature)
-      const enhancedBlockData = {
-        ...blockHeader,
-        gasPrice: blockHeader.baseFeePerGas ? parseInt(blockHeader.baseFeePerGas, 16) / 1e9 : null,
-        timestamp: Date.now()
+    try {
+      // Extract block number from various possible field names
+      const blockNumberHex = blockHeader.number || blockHeader.blockNumber
+      
+      if (!blockNumberHex) {
+        console.error(`❌ [${this.connectionId}] Block header has no number field:`, blockHeader)
+        console.error(`❌ [${this.connectionId}] Available keys:`, Object.keys(blockHeader))
+        return
       }
-
-      const blockUpdate: RealtimeUpdate = {
-        type: 'newBlock',
-        data: enhancedBlockData,
-        timestamp: Date.now()
+      
+      const blockNumber = typeof blockNumberHex === 'string' 
+        ? parseInt(blockNumberHex, 16) 
+        : blockNumberHex
+      
+      if (isNaN(blockNumber)) {
+        console.error(`❌ [${this.connectionId}] Invalid block number: ${blockNumberHex}`)
+        return
       }
+      
+      if (blockNumber > this.lastBlockNumber) {
+        this.log(`🔗 [${this.connectionId}] New block #${blockNumber}`)
+        this.lastBlockNumber = blockNumber
 
-      // Emit gas price update (Tier 1 feature)
-      if (blockHeader.baseFeePerGas) {
-        const gasPriceUpdate: RealtimeUpdate = {
-          type: 'gasPriceUpdate',
-          data: {
-            gasPrice: parseInt(blockHeader.baseFeePerGas, 16) / 1e9,
-            blockNumber: blockNumber
-          },
+        // Enhanced block update with gas price (Tier 1 feature)
+        const enhancedBlockData = {
+          ...blockHeader,
+          // Normalize the number field
+          number: blockNumberHex,
+          gasPrice: blockHeader.baseFeePerGas ? parseInt(blockHeader.baseFeePerGas, 16) / 1e9 : null,
+          timestamp: blockHeader.timestamp || Math.floor(Date.now() / 1000).toString(16)
+        }
+
+        // **CRITICAL FIX**: Add to cache for smart caching
+        this.recentBlocksCache.unshift(enhancedBlockData)
+        // Keep only last 500 blocks (rolling window)
+        if (this.recentBlocksCache.length > MAX_GLOBAL_CACHE_BLOCKS) {
+          this.recentBlocksCache = this.recentBlocksCache.slice(0, MAX_GLOBAL_CACHE_BLOCKS)
+        }
+        
+        // Reduce logging spam - only log every 5th block
+        if (this.recentBlocksCache.length % 5 === 0) {
+          this.log(`📦 [${this.connectionId}] Cache: ${this.recentBlocksCache.length} blocks (latest: #${blockNumber})`)
+        }
+        
+        // Save to localStorage for persistence across page reloads (debounced to every 5s)
+        this.saveCacheToStorage()
+        
+        // **FIX**: Notify subscribers that cache is now available (first block)
+        if (this.recentBlocksCache.length === 1) {
+          console.log(`🎉 [${this.connectionId}] Cache is now available! Notifying pages...`)
+        }
+
+        const blockUpdate: RealtimeUpdate = {
+          type: 'newBlock',
+          data: enhancedBlockData,
           timestamp: Date.now()
         }
-        this.notifyCallbacks(gasPriceUpdate)
-      }
 
-      this.notifyCallbacks(blockUpdate)
+        // Emit gas price update (Tier 1 feature)
+        if (blockHeader.baseFeePerGas) {
+          const gasPriceUpdate: RealtimeUpdate = {
+            type: 'gasPriceUpdate',
+            data: {
+              gasPrice: parseInt(blockHeader.baseFeePerGas, 16) / 1e9,
+              blockNumber: blockNumber
+            },
+            timestamp: Date.now()
+          }
+          this.notifyCallbacks(gasPriceUpdate)
+        }
 
-      // Extract transactions from the full block since RETH optimized mode 
-      // doesn't support newPendingTransactions subscription
-      try {
-        const fullBlock = await rethClient.getBlock(blockHeader.hash, true)
-        if (fullBlock && fullBlock.transactions && Array.isArray(fullBlock.transactions)) {
-          console.log(`📦 [${this.connectionId}] Block #${blockNumber} has ${fullBlock.transactions.length} transactions`)
-          
-          // Emit transaction updates for each transaction in the block
-          for (const txHash of fullBlock.transactions) {
-            if (typeof txHash === 'string' && !this.lastTransactionHashes.has(txHash)) {
-              this.handleNewTransaction(txHash)
+        this.notifyCallbacks(blockUpdate)
+
+        // Extract transactions from the full block since RETH optimized mode 
+        // doesn't support newPendingTransactions subscription
+        try {
+          const blockHash = blockHeader.hash || blockHeader.blockHash
+          if (blockHash) {
+            const fullBlock = await rethClient.getBlock(blockHash, true)
+            if (fullBlock && fullBlock.transactions && Array.isArray(fullBlock.transactions)) {
+              this.log(`📦 [${this.connectionId}] Block #${blockNumber} has ${fullBlock.transactions.length} transactions`)
+              
+              // Emit transaction updates for each transaction in the block
+              for (const txHash of fullBlock.transactions) {
+                if (typeof txHash === 'string' && !this.lastTransactionHashes.has(txHash)) {
+                  this.handleNewTransaction(txHash)
+                }
+              }
             }
           }
+        } catch (error) {
+          console.warn(`⚠️ [${this.connectionId}] Failed to fetch full block for transactions:`, error)
         }
-      } catch (error) {
-        console.warn(`⚠️ [${this.connectionId}] Failed to fetch full block for transactions:`, error)
       }
+    } catch (error) {
+      console.error(`❌ [${this.connectionId}] Error in handleNewBlock:`, error)
+      console.error(`❌ [${this.connectionId}] Block header that caused error:`, blockHeader)
     }
   }
 
   private handleNewTransaction(txHash: string) {
     if (!this.lastTransactionHashes.has(txHash)) {
-      console.log(`💸 [${this.connectionId}] New transaction: ${txHash.slice(0, 10)}...`)
+      this.log(`💸 [${this.connectionId}] New transaction: ${txHash.slice(0, 10)}...`)
       this.lastTransactionHashes.add(txHash)
 
       // Keep only last 1000 transaction hashes to prevent memory leaks
@@ -252,7 +528,10 @@ class RealtimeWebSocketManager {
   // Tier 1: Handle pending transactions from WebSocket subscription
   private handleNewPendingTransaction(txHash: string) {
     if (!this.lastTransactionHashes.has(txHash)) {
-      console.log(`⚡ [${this.connectionId}] New pending transaction: ${txHash.slice(0, 10)}...`)
+      // Reduce logging - only log every 10th transaction
+      if (this.lastTransactionHashes.size % 10 === 0) {
+        this.log(`⚡ [${this.connectionId}] Pending txs: ${this.lastTransactionHashes.size}`)
+      }
       this.lastTransactionHashes.add(txHash)
 
       // Keep only last 1000 transaction hashes to prevent memory leaks
@@ -273,6 +552,175 @@ class RealtimeWebSocketManager {
     }
   }
 
+  // Fetch validator peer list from Summit node (via API route to avoid CORS)
+  private async fetchValidatorPeers() {
+    try {
+      // Use our API route which fetches server-side
+      const peerListUrl = '/api/validator-peers'
+      
+      this.log(`🔍 [${this.connectionId}] Fetching validator peers via API route`)
+      
+      const response = await fetch(peerListUrl, {
+        signal: AbortSignal.timeout(10000)
+      })
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`)
+      }
+      
+      const data = await response.json()
+      const peers = data.validators || []
+      
+      // Check if data changed
+      const dataChanged = JSON.stringify(peers) !== JSON.stringify(this.validatorPeers)
+      
+      if (dataChanged) {
+        this.log(`✅ [${this.connectionId}] Validator peers updated: ${peers.length} peers`)
+        this.validatorPeers = peers
+        this.validatorPeersLastUpdate = Date.now()
+        
+        // Data changed - poll more frequently (1 minute)
+        this.validatorPeersPollInterval = 60000
+        
+        // Notify subscribers immediately with raw peer data
+        const validatorUpdate: RealtimeUpdate = {
+          type: 'validatorPeersUpdate' as any,
+          data: this.validatorPeers,
+          timestamp: Date.now()
+        }
+        this.notifyCallbacks(validatorUpdate)
+        
+        // Fetch GeoIP data asynchronously (don't block WebSocket manager)
+        this.enrichPeersWithGeoIP().catch(err => {
+          console.error(`[${this.connectionId}] GeoIP enrichment failed:`, err)
+        })
+      } else {
+        // No change - poll less frequently (5 minutes)
+        this.validatorPeersPollInterval = 300000
+        this.log(`📍 [${this.connectionId}] No peer changes, extending poll to 5 minutes`)
+      }
+      
+    } catch (error) {
+      console.error(`❌ [${this.connectionId}] Failed to fetch validator peers:`, error)
+    }
+  }
+
+  // Enrich peer list with GeoIP data (OPTIMIZED: uses batch API + caching)
+  private async enrichPeersWithGeoIP() {
+    if (this.validatorPeers.length === 0) return
+    
+    try {
+      // Check localStorage cache for GeoIP data (24 hour TTL)
+      const GEOIP_CACHE_KEY = 'ritual-scan-geoip-cache'
+      const GEOIP_CACHE_TTL = 24 * 60 * 60 * 1000 // 24 hours
+      
+      let geoIPCache: Record<string, any> = {}
+      try {
+        const cached = localStorage.getItem(GEOIP_CACHE_KEY)
+        if (cached) {
+          const parsed = JSON.parse(cached)
+          // Check if cache is still valid
+          if (parsed.timestamp && Date.now() - parsed.timestamp < GEOIP_CACHE_TTL) {
+            geoIPCache = parsed.data || {}
+            this.log(`📦 [${this.connectionId}] Loaded GeoIP cache with ${Object.keys(geoIPCache).length} entries`)
+          }
+        }
+      } catch (e) {
+        // Invalid cache, ignore
+      }
+      
+      // Check which IPs need fetching (not in cache)
+      const ipsToFetch: string[] = []
+      const ipMap: Map<string, any> = new Map()
+      
+      this.validatorPeers.forEach(peer => {
+        const ipOnly = peer.ip_address?.split(':')[0] || peer.ip_address
+        if (ipOnly && !geoIPCache[ipOnly]) {
+          ipsToFetch.push(ipOnly)
+        }
+        ipMap.set(peer.ip_address, peer)
+      })
+      
+      // If we need to fetch new IPs, do batch request
+      if (ipsToFetch.length > 0) {
+        this.log(`🌍 [${this.connectionId}] Fetching GeoIP for ${ipsToFetch.length} new IPs (${Object.keys(geoIPCache).length} cached)`)
+        
+        const batchQuery = ipsToFetch.map(ip => ({
+          query: ip,
+          fields: 'status,country,city,lat,lon'
+        }))
+        
+        const geoResponse = await fetch('http://ip-api.com/batch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(batchQuery),
+          signal: AbortSignal.timeout(5000)
+        })
+        
+        if (geoResponse.ok) {
+          const geoResults = await geoResponse.json()
+          
+          // Update cache with new results
+          geoResults.forEach((result: any, index: number) => {
+            if (result?.status === 'success') {
+              geoIPCache[ipsToFetch[index]] = {
+                lat: result.lat,
+                lon: result.lon,
+                city: result.city,
+                country: result.country
+              }
+            }
+          })
+          
+          // Save updated cache
+          localStorage.setItem(GEOIP_CACHE_KEY, JSON.stringify({
+            timestamp: Date.now(),
+            data: geoIPCache
+          }))
+        }
+      } else {
+        this.log(`✅ [${this.connectionId}] All ${this.validatorPeers.length} IPs already in cache, skipping batch request`)
+      }
+      
+      // Enrich peers with cached + fetched data
+      const enrichedPeers = this.validatorPeers.map(peer => {
+        const ipOnly = peer.ip_address?.split(':')[0] || peer.ip_address
+        const geoData = geoIPCache[ipOnly]
+        
+        if (geoData) {
+          return {
+            ...peer,
+            lat: geoData.lat,
+            lon: geoData.lon,
+            city: geoData.city,
+            country: geoData.country,
+            isReal: true
+          }
+        }
+        return { ...peer, isReal: false }
+      })
+      
+      this.validatorPeers = enrichedPeers
+      const realCount = enrichedPeers.filter(p => p.isReal).length
+      this.logImportant(`🌍 [${this.connectionId}] Enriched ${realCount}/${enrichedPeers.length} peers with GeoIP data${ipsToFetch.length > 0 ? ` (fetched ${ipsToFetch.length} new)` : ' (all from cache)'}`)
+      
+      // Save to localStorage
+      this.saveCacheToStorage()
+      
+      // Notify subscribers with enriched data
+      const validatorUpdate: RealtimeUpdate = {
+        type: 'validatorPeersUpdate' as any,
+        data: this.validatorPeers,
+        timestamp: Date.now()
+      }
+      this.notifyCallbacks(validatorUpdate)
+      
+    } catch (error) {
+      console.error(`❌ [${this.connectionId}] Batch GeoIP enrichment failed:`, error)
+      // Keep peers without location data
+    }
+  }
+
   private startHighFrequencyPolling() {
     // High-frequency mempool polling (every 2 seconds)
     this.mempoolCheckInterval = setInterval(async () => {
@@ -281,6 +729,12 @@ class RealtimeWebSocketManager {
           rethClient.getMempoolStats(),
           rethClient.getScheduledTransactions()
         ])
+
+        // **CRITICAL FIX**: Add to cache for smart caching
+        this.latestMempoolStats = mempoolStats
+        this.latestScheduledTxs = scheduledTxs
+        
+        this.log(`📦 [${this.connectionId}] Cache updated: mempool + ${scheduledTxs?.length || 0} scheduled txs`)
 
         const mempoolUpdate: RealtimeUpdate = {
           type: 'mempoolUpdate',
@@ -301,6 +755,17 @@ class RealtimeWebSocketManager {
         console.error(`❌ [${this.connectionId}] High-frequency polling error:`, error)
       }
     }, 2000) // Every 2 seconds
+    
+    // Validator peers polling (dynamic interval: 1-5 minutes)
+    const pollValidatorPeers = async () => {
+      await this.fetchValidatorPeers()
+      
+      // Schedule next poll with dynamic interval
+      this.validatorPeersInterval = setTimeout(pollValidatorPeers, this.validatorPeersPollInterval)
+    }
+    
+    // Start initial fetch
+    pollValidatorPeers()
 
     // Block polling as backup (every 2 seconds)
     this.blockCheckInterval = setInterval(async () => {
@@ -336,7 +801,7 @@ class RealtimeWebSocketManager {
 
     this.reconnectAttemps++
     
-    console.log(`🔄 [${this.connectionId}] Scheduling reconnect attempt ${this.reconnectAttemps}/${this.maxReconnectAttempts} in ${this.reconnectInterval}ms`)
+    this.log(`🔄 [${this.connectionId}] Scheduling reconnect attempt ${this.reconnectAttemps}/${this.maxReconnectAttempts} in ${this.reconnectInterval}ms`)
 
     setTimeout(() => {
       this.startConnection()
@@ -351,14 +816,89 @@ class RealtimeWebSocketManager {
 
   // Public API
   subscribe(callbackId: string, callback: UpdateCallback): () => void {
-    console.log(`📻 [${this.connectionId}] New subscriber: ${callbackId}`)
+    this.log(`📻 [${this.connectionId}] New subscriber: ${callbackId}`)
     this.callbacks.set(callbackId, callback)
 
     // Return unsubscribe function
     return () => {
-      console.log(`📻 [${this.connectionId}] Unsubscribing: ${callbackId}`)
+      this.log(`📻 [${this.connectionId}] Unsubscribing: ${callbackId}`)
       this.callbacks.delete(callbackId)
     }
+  }
+
+  // **CRITICAL FIX**: Add cache access methods
+  getCachedBlocks(): any[] {
+    // Reduce logging spam - only log when cache is empty or has significant size
+    if (this.recentBlocksCache.length === 0 || this.recentBlocksCache.length % 10 === 0) {
+      console.log(`🔍 [${this.connectionId}] getCachedBlocks called - returning ${this.recentBlocksCache.length} blocks`)
+    }
+    return [...this.recentBlocksCache] // Return copy to prevent mutation
+  }
+
+  getCachedScheduledTxs(): any[] {
+    return [...this.latestScheduledTxs]
+  }
+
+  getCachedMempoolStats(): any {
+    return { ...this.latestMempoolStats }
+  }
+  
+  getCachedValidatorPeers(): any[] {
+    return [...this.validatorPeers]
+  }
+  
+  getValidatorPeersLastUpdate(): number {
+    return this.validatorPeersLastUpdate
+  }
+
+  // Per-page expanding window management
+  getPageBlockWindow(pageId: string): any[] {
+    return this.pageBlockWindows.get(pageId) || []
+  }
+
+  setPageBlockWindow(pageId: string, blocks: any[]) {
+    this.pageBlockWindows.set(pageId, blocks)
+    this.log(`📊 [${this.connectionId}] Page '${pageId}' window: ${blocks.length} blocks`)
+  }
+
+  addBlockToPageWindow(pageId: string, block: any) {
+    const currentWindow = this.pageBlockWindows.get(pageId) || []
+    const blockNumber = parseInt(block.number || block.blockNumber, 16)
+    
+    // Don't add if already exists
+    if (currentWindow.some((b: any) => parseInt(b.number, 16) === blockNumber)) {
+      return
+    }
+    
+    // Add to front (newest first) - O(1) operation
+    currentWindow.unshift(block)
+    
+    // Enforce 1000 block limit - keep most recent, trim oldest (deque-like behavior)
+    if (currentWindow.length > MAX_PAGE_WINDOW_BLOCKS) {
+      const removed = currentWindow.pop() // Remove oldest from back - O(1) operation
+      const removedBlockNum = removed ? parseInt(removed.number || removed.blockNumber, 16) : '?'
+      this.logImportant(`🗑️ [${this.connectionId}] Page '${pageId}' exceeded ${MAX_PAGE_WINDOW_BLOCKS} block limit - removed oldest block #${removedBlockNum} (keeping most recent ${currentWindow.length})`)
+    }
+    
+    this.pageBlockWindows.set(pageId, currentWindow)
+    this.log(`➕ [${this.connectionId}] Added block #${blockNumber} to '${pageId}' window (total: ${currentWindow.length})`)
+  }
+
+  clearPageBlockWindow(pageId: string) {
+    this.pageBlockWindows.delete(pageId)
+    this.log(`🗑️ [${this.connectionId}] Cleared '${pageId}' window`)
+  }
+
+  // Get stats for all page windows
+  getPageWindowsStats(): Record<string, { blocks: number, maxBlocks: number }> {
+    const stats: Record<string, { blocks: number, maxBlocks: number }> = {}
+    this.pageBlockWindows.forEach((blocks, pageId) => {
+      stats[pageId] = { 
+        blocks: blocks.length,
+        maxBlocks: MAX_PAGE_WINDOW_BLOCKS
+      }
+    })
+    return stats
   }
 
   getConnectionStatus() {
@@ -367,8 +907,44 @@ class RealtimeWebSocketManager {
       connectionId: this.connectionId,
       subscriberCount: this.callbacks.size,
       lastBlockNumber: this.lastBlockNumber,
-      reconnectAttempts: this.reconnectAttemps
+      reconnectAttempts: this.reconnectAttemps,
+      cacheStats: {
+        blocks: this.recentBlocksCache.length,
+        scheduledTxs: this.latestScheduledTxs.length,
+        hasMempoolStats: Object.keys(this.latestMempoolStats).length > 0
+      }
     }
+  }
+
+  // Debug method to verify cache state
+  debugCacheState() {
+    const state = {
+      connection: {
+        id: this.connectionId,
+        isConnected: this.isConnected,
+        lastBlockNumber: this.lastBlockNumber,
+        wsState: this.ws?.readyState
+      },
+      cache: {
+        globalBlocks: this.recentBlocksCache.length,
+        globalMaxBlocks: MAX_GLOBAL_CACHE_BLOCKS,
+        scheduledTxsCount: this.latestScheduledTxs.length,
+        mempoolStatsKeys: Object.keys(this.latestMempoolStats),
+        firstBlock: this.recentBlocksCache[0] ? {
+          number: this.recentBlocksCache[0].number,
+          hash: this.recentBlocksCache[0].hash,
+          timestamp: this.recentBlocksCache[0].timestamp
+        } : null
+      },
+      pageWindows: this.getPageWindowsStats(),
+      limits: {
+        globalCache: `${MAX_GLOBAL_CACHE_BLOCKS} blocks (rolling)`,
+        perPageWindow: `${MAX_PAGE_WINDOW_BLOCKS} blocks (most recent)`
+      },
+      subscribers: this.callbacks.size
+    }
+    console.log('🔍 [DEBUG] Cache State:', JSON.stringify(state, null, 2))
+    return state
   }
 
   disconnect() {
@@ -383,6 +959,11 @@ class RealtimeWebSocketManager {
       clearInterval(this.blockCheckInterval)
       this.blockCheckInterval = null
     }
+    
+    if (this.validatorPeersInterval) {
+      clearTimeout(this.validatorPeersInterval)
+      this.validatorPeersInterval = null
+    }
 
     if (this.ws) {
       this.ws.close()
@@ -395,7 +976,7 @@ class RealtimeWebSocketManager {
 
   // Force refresh specific data types
   async forceRefresh(type: 'mempool' | 'scheduled' | 'blocks') {
-    console.log(`🔄 [${this.connectionId}] Force refreshing ${type}`)
+    this.log(`🔄 [${this.connectionId}] Force refreshing ${type}`)
     
     try {
       switch (type) {
@@ -430,14 +1011,25 @@ class RealtimeWebSocketManager {
   }
 }
 
-// Global singleton instance
-let realtimeManager: RealtimeWebSocketManager | null = null
-
-export function getRealtimeManager(): RealtimeWebSocketManager {
-  if (!realtimeManager && typeof window !== 'undefined') {
-    realtimeManager = new RealtimeWebSocketManager()
+// Global singleton instance - stored in window to persist across Next.js navigations
+declare global {
+  interface Window {
+    __realtimeManager?: RealtimeWebSocketManager
   }
-  return realtimeManager!
+}
+
+export function getRealtimeManager(): RealtimeWebSocketManager | null {
+  // Handle SSR gracefully - return null during server-side rendering
+  if (typeof window === 'undefined') {
+    return null as any // SSR - no WebSocket manager
+  }
+  
+  // Check window first (persists across Next.js navigations)
+  if (!window.__realtimeManager) {
+    window.__realtimeManager = new RealtimeWebSocketManager()
+  }
+  
+  return window.__realtimeManager
 }
 
 export function useRealtime(callbackId: string, callback: UpdateCallback) {
@@ -445,11 +1037,25 @@ export function useRealtime(callbackId: string, callback: UpdateCallback) {
   return manager?.subscribe(callbackId, callback)
 }
 
-// Cleanup on page unload
+// Debug utilities - accessible from browser console
+export function debugWebSocketCache() {
+  if (typeof window !== 'undefined' && window.__realtimeManager) {
+    return window.__realtimeManager.debugCacheState()
+  } else {
+    console.error('❌ No realtime manager instance found')
+    return null
+  }
+}
+
+// Make debug function available globally in browser
 if (typeof window !== 'undefined') {
+  (window as any).debugWebSocketCache = debugWebSocketCache;
+  (window as any).getRealtimeManager = getRealtimeManager;
+  
+  // Cleanup on page unload
   window.addEventListener('beforeunload', () => {
-    if (realtimeManager) {
-      realtimeManager.disconnect()
+    if (window.__realtimeManager) {
+      window.__realtimeManager.disconnect()
     }
   })
 }

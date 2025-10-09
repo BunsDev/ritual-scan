@@ -6,15 +6,15 @@ steps:
   - name: 'gcr.io/cloud-builders/docker'
     args: [
       'build', 
-      '-t', 'gcr.io/$PROJECT_ID/ritual-explorer:$COMMIT_SHA',
-      '-t', 'gcr.io/$PROJECT_ID/ritual-explorer:latest',
+      '-t', 'gcr.io/$PROJECT_ID/ritual-scan:$COMMIT_SHA',
+      '-t', 'gcr.io/$PROJECT_ID/ritual-scan:latest',
       '.'
     ]
     id: 'build-image'
 
   # Push the container image to Container Registry  
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['push', '--all-tags', 'gcr.io/$PROJECT_ID/ritual-explorer']
+    args: ['push', '--all-tags', 'gcr.io/$PROJECT_ID/ritual-scan']
     id: 'push-image'
     waitFor: ['build-image']
 
@@ -24,9 +24,9 @@ steps:
     args:
     - 'run'
     - 'deploy'
-    - 'ritual-explorer'
+    - 'ritual-scan'
     - '--image'
-    - 'gcr.io/$PROJECT_ID/ritual-explorer:$COMMIT_SHA'
+    - 'gcr.io/$PROJECT_ID/ritual-scan:$COMMIT_SHA'
     - '--region'
     - '${_REGION}'
     - '--platform'
@@ -40,8 +40,8 @@ steps:
     - '10'
     - '--port'
     - '3000'
-    - '--service-account'
-    - 'ritual-explorer-sa@$PROJECT_ID.iam.gserviceaccount.com'
+    # - '--service-account'
+    # - 'ritual-scan-sa@$PROJECT_ID.iam.gserviceaccount.com'
     - '--set-env-vars'
     - 'NODE_ENV=production,NEXT_TELEMETRY_DISABLED=1'
     - '--set-secrets'
@@ -56,7 +56,7 @@ steps:
     - '-c'
     - |
       # Get service URL
-      SERVICE_URL=$(gcloud run services describe ritual-explorer --region=${_REGION} --format='value(status.url)')
+      SERVICE_URL=$(gcloud run services describe ritual-scan --region=${_REGION} --format='value(status.url)')
       echo "Deployed to: $$SERVICE_URL"
       
       # Wait for service to be ready and test health endpoint
@@ -89,5 +89,5 @@ timeout: 1200s
 # Store build logs and artifacts
 artifacts:
   images:
-  - 'gcr.io/$PROJECT_ID/ritual-explorer:$COMMIT_SHA'
-  - 'gcr.io/$PROJECT_ID/ritual-explorer:latest'
+  - 'gcr.io/$PROJECT_ID/ritual-scan:$COMMIT_SHA'
+  - 'gcr.io/$PROJECT_ID/ritual-scan:latest'

@@ -1,0 +1,132 @@
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: akilesh@ritual.net
+    privateKeySecretRef:
+      name: letsencrypt-prod-key
+    solvers:
+    - http01:
+        ingress:
+          class: nginx
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: ws-ding-fish-cert
+  namespace: default
+spec:
+  secretName: ws-ding-fish-tls
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  dnsNames:
+  - ws.ding.fish
+  usages:
+  - digital signature
+  - key encipherment
+  - server auth
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-ws-ssl-config
+data:
+  nginx.conf: |
+    events {
+        worker_connections 4096;
+    }
+    
+    http {
+        upstream rpc_websocket {
+            server 35.196.101.134:8546;
+        }
+        
+        # HTTPS server with real certificate
+        server {
+            listen 443 ssl http2;
+            server_name ws.ding.fish;
+            
+            # Let's Encrypt certificate
+            ssl_certificate /etc/nginx/ssl/tls.crt;
+            ssl_certificate_key /etc/nginx/ssl/tls.key;
+            
+            # SSL settings
+            ssl_protocols TLSv1.2 TLSv1.3;
+            ssl_ciphers HIGH:!aNULL:!MD5;
+            ssl_prefer_server_ciphers on;
+            
+            location / {
+                proxy_pass http://rpc_websocket;
+                proxy_http_version 1.1;
+                proxy_set_header Upgrade $http_upgrade;
+                proxy_set_header Connection "upgrade";
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_read_timeout 86400s;
+                proxy_send_timeout 86400s;
+            }
+        }
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-ws-ssl
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: nginx-ws-ssl
+  template:
+    metadata:
+      labels:
+        app: nginx-ws-ssl
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:alpine
+        ports:
+        - containerPort: 443
+          name: https
+        volumeMounts:
+        - name: nginx-config
+          mountPath: /etc/nginx/nginx.conf
+          subPath: nginx.conf
+        - name: tls-cert
+          mountPath: /etc/nginx/ssl
+          readOnly: true
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "200m"
+          limits:
+            memory: "512Mi"
+            cpu: "400m"
+      volumes:
+      - name: nginx-config
+        configMap:
+          name: nginx-ws-ssl-config
+      - name: tls-cert
+        secret:
+          secretName: ws-ding-fish-tls
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-ws-ssl-lb
+spec:
+  type: LoadBalancer
+  loadBalancerIP: 34.27.235.176
+  selector:
+    app: nginx-ws-ssl
+  ports:
+  - name: https
+    port: 443
+    targetPort: 443
+    protocol: TCP
+

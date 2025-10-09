@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebSocket Debug Test</title>
+</head>
+<body>
+    <h1>WebSocket Debug Test</h1>
+    <div id="status">Testing...</div>
+    <div id="logs"></div>
+
+    <script>
+        const statusDiv = document.getElementById('status');
+        const logsDiv = document.getElementById('logs');
+        
+        function log(message) {
+            console.log(message);
+            logsDiv.innerHTML += '<div>' + new Date().toLocaleTimeString() + ': ' + message + '</div>';
+        }
+        
+        // Test WebSocket connection to the configured endpoint
+        const wsUrl = 'ws://35.196.101.134:8546';
+        log('Attempting WebSocket connection to: ' + wsUrl);
+        
+        try {
+            const ws = new WebSocket(wsUrl);
+            
+            ws.onopen = function() {
+                log('✅ WebSocket connected successfully!');
+                statusDiv.innerHTML = '✅ WebSocket Connected';
+                
+                // Test a simple RPC call
+                const testMessage = {
+                    jsonrpc: '2.0',
+                    method: 'eth_blockNumber',
+                    params: [],
+                    id: 1
+                };
+                
+                ws.send(JSON.stringify(testMessage));
+                log('Sent test message: ' + JSON.stringify(testMessage));
+            };
+            
+            ws.onmessage = function(event) {
+                log('📩 Received: ' + event.data);
+            };
+            
+            ws.onerror = function(error) {
+                log('❌ WebSocket error: ' + JSON.stringify(error));
+                statusDiv.innerHTML = '❌ WebSocket Error';
+            };
+            
+            ws.onclose = function(event) {
+                log('🔌 WebSocket closed: ' + event.code + ' - ' + event.reason);
+                statusDiv.innerHTML = '🔌 WebSocket Closed';
+            };
+            
+        } catch (error) {
+            log('❌ Failed to create WebSocket: ' + error.message);
+            statusDiv.innerHTML = '❌ Failed to create WebSocket';
+        }
+        
+        // Also test HTTP RPC
+        log('Testing HTTP RPC...');
+        fetch('http://35.196.101.134:8545', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                jsonrpc: '2.0',
+                method: 'eth_blockNumber',
+                params: [],
+                id: 1
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            log('✅ HTTP RPC works: ' + JSON.stringify(data));
+        })
+        .catch(error => {
+            log('❌ HTTP RPC failed: ' + error.message);
+        });
+    </script>
+</body>
+</html>

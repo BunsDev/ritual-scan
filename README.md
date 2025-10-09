@@ -1,13 +1,14 @@
-# Ritual Explorer
+# Ritual Scan
 
-![Ritual Explorer](https://img.shields.io/badge/Ritual-Explorer-84cc16?style=for-the-badge&logo=blockchain&logoColor=white)
+A blockchain explorer for Ritual Chain with support for async transactions, scheduled jobs, and real-time updates.
+
+![Ritual Scan](https://img.shields.io/badge/Ritual-Scan-84cc16?style=for-the-badge&logo=blockchain&logoColor=white)
 ![Next.js](https://img.shields.io/badge/Next.js-15-black?style=for-the-badge&logo=next.js)
 ![TypeScript](https://img.shields.io/badge/TypeScript-100%25-blue?style=for-the-badge&logo=typescript)
 ![Real-time](https://img.shields.io/badge/WebSocket-Real--time-84cc16?style=for-the-badge)
+![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
 
-A blockchain explorer for **Ritual Chain** that supports async transactions, scheduled jobs, and real-time updates.
-
-## Key Features
+## Features
 
 **Ritual Chain Support**
 - Async transaction flow visualization
@@ -17,115 +18,344 @@ A blockchain explorer for **Ritual Chain** that supports async transactions, sch
 - Search by Call ID, origin transaction, or precompile address
 
 **Real-Time Updates**
-- WebSocket connection to RETH nodes
-- Mempool updates every 2 seconds
-- Connection status indicators
+- WebSocket connection to RETH nodes with smart caching
+- Instant page navigation with 0ms load times
+- Live mempool monitoring
+- Connection status indicators with auto-reconnection
 
-**Analytics**
-- Transaction type distribution
-- Protocol fee analysis
-- System vs user transaction metrics
+**Performance**
+- Smart caching system for instant navigation
+- Real-time validator statistics
+- Progressive data loading
+- Mobile-responsive design
+
+## Quick Start
+
+```bash
+git clone https://github.com/ritual-net/ritual-scan.git
+cd ritual-scan
+npm install
+cp .env.example .env.local
+# Edit .env.local with your RPC endpoints
+npm run dev
+```
+
+Visit `http://localhost:3000` to see the explorer.
 
 ## Screenshots
 
+### Homepage Dashboard
 
-### Async Settlement Transaction (Type 0x12)
+![Homepage Dashboard](./docs/screenshots/homepage.png)
 
-![Async Settlement Transaction (Type 0x12)](./docs/screenshots/tx-async-settlement.png)
+Real-time network overview with latest blocks, transactions, and live stats
 
-Final settlement transaction with fee distribution in Ritual Chain async execution
+### Charts Dashboard
 
+![Charts Dashboard](./docs/screenshots/charts.png)
 
-### EIP-1559 Transaction (Type 0x2)
+Visual analytics with gas usage, transaction counts, and performance metrics
 
-![EIP-1559 Transaction (Type 0x2)](./docs/screenshots/tx-eip1559.png)
+### Ritual Chain Stats
 
-Modern EIP-1559 transaction with priority fee and base fee mechanism
+![Ritual Chain Stats](./docs/screenshots/stats.png)
 
+Async adoption metrics, protocol fees, and transaction type distribution
 
-### Scheduled Transaction (Type 0x10)
+### Block Explorer
 
-![Scheduled Transaction (Type 0x10)](./docs/screenshots/tx-scheduled.png)
+![Block Explorer](./docs/screenshots/blocks.png)
 
-Ritual Chain scheduled transaction with Call ID tracking and cron-like execution
+Real-time block list with live updates via WebSocket
 
+### Validator Network Map
 
-##  Architecture
+![Validator Network Map](./docs/screenshots/validators.png)
 
-### **Frontend Stack**
-- **Next.js 14** with App Router and React Server Components
-- **TypeScript** for complete type safety
-- **Tailwind CSS** with lime/black Ritual theme
-- **Real-time WebSocket** manager for live updates
+Geographic visualization of validator network with activity metrics
 
-### **Blockchain Integration**
-- **Enhanced RETHClient** with Ritual-specific RPC methods
-- **Multi-node Support** with fallback mechanisms  
-- **Transaction Type Detection** for all 5 Ritual transaction types
-- **System Account Recognition** and special handling
+### Network Leaderboard
 
-### **Real-Time Features**
-- **WebSocket Manager** with automatic reconnection
-- **React Hooks** for easy real-time integration
-- **Update Throttling** and type filtering
-- **Connection Status Monitoring**
+![Network Leaderboard](./docs/screenshots/leaderboard.png)
 
-##  Getting Started
+Top validators and network participants ranked by activity
 
-### Prerequisites
-- Node.js 18+ 
-- Docker (optional)
-- Access to Ritual Chain RETH nodes
+### Live Mempool Monitor
 
-### Installation
+![Live Mempool Monitor](./docs/screenshots/mempool.png)
+
+Real-time pending transactions and scheduled jobs
+
+### Scheduled Transactions
+
+![Scheduled Transactions](./docs/screenshots/mempool-scheduled.png)
+
+Scheduled transactions waiting to execute
+
+### Async Transactions
+
+![Async Transactions](./docs/screenshots/mempool-async.png)
+
+Async commitment and settlement transactions
+
+### RPC Configuration
+
+![RPC Configuration](./docs/screenshots/settings.png)
+
+User-configurable RPC endpoints with connection testing
+
+## Production Deployment
+
+### GKE Deployment with Makefile
+
+The project includes a comprehensive Makefile for production deployments to Google Kubernetes Engine.
 
 ```bash
-# Clone the repository
-git clone <repository-url>
-cd ritual-explorer
+# Navigate to scripts directory
+cd scripts
 
-# Install dependencies
-npm install
+# Show all available targets
+make help
 
-# Start development server
-npm run dev
+# Build and deploy to GKE
+make gke-deploy
 
-# Open browser to http://localhost:3000
+# Build Docker image
+make docker-build
+
+# Push to container registry
+make docker-push
+
+# Deploy to Cloud Run
+make cloud-run-deploy
 ```
 
-### Docker Deployment
+### Manual GKE Deployment
+
+If you prefer manual deployment control:
 
 ```bash
-# Build and run with Docker
-docker build -t ritual-explorer .
-docker run -d -p 9000:3000 --name ritual-explorer ritual-explorer
+# Set up Google Cloud project
+export PROJECT_ID=your-project-id
+gcloud config set project $PROJECT_ID
+
+# Build and push container
+gcloud builds submit --config cloudbuild.yaml
+
+# Deploy using kubectl (if using GKE cluster)
+kubectl apply -f k8s/
+
+# Or deploy to Cloud Run
+gcloud run deploy ritual-scan \
+  --image gcr.io/$PROJECT_ID/ritual-scan:latest \
+  --region us-central1 \
+  --allow-unauthenticated \
+  --memory 2Gi \
+  --cpu 2
 ```
 
-##  Configuration
+### Environment Configuration
 
-### Environment Variables
+Create the required environment files for your deployment target:
 
-```env
-# RPC Configuration
-NEXT_PUBLIC_RPC_URL=http://35.185.40.237:8545
-NEXT_PUBLIC_WS_URL=ws://35.185.40.237:8546
-
-# Network Configuration  
-NEXT_PUBLIC_NETWORK_NAME=Shrinenet
-NEXT_PUBLIC_CURRENCY_SYMBOL=RITUAL
+**Local Development:**
+```bash
+cp .env.example .env.local
+# Edit .env.local with your RPC endpoints
 ```
 
-### Real-Time WebSocket
+**Production (Cloud Run/GKE):**
+```bash
+cp .env.example .env.production
+# Configure production RPC endpoints and settings
+```
 
-The explorer automatically connects to RETH WebSocket endpoints for:
-- New block headers (`eth_subscribe` → `newHeads`)
-- Pending transactions (`eth_subscribe` → `newPendingTransactions`)  
-- Mempool updates (high-frequency polling)
-- Scheduled transaction monitoring
+**Kubernetes:**
+```bash
+cp .env.gke.template .env.gke
+# Configure for GKE deployment with secrets
+```
 
-##  Ritual Chain Features
+### Required Infrastructure
 
-### **Transaction Types Supported**
+Before deploying, ensure you have:
+
+1. **RETH Node Access**: Running RETH nodes with RPC (8545) and WebSocket (8546) endpoints
+2. **Google Cloud Project**: With Container Registry and Cloud Run/GKE enabled
+3. **Service Account**: With appropriate permissions for deployment
+4. **Secrets**: Configure RPC URLs in Google Secret Manager
+
+### Health Checks
+
+The application includes health check endpoints:
+
+- `GET /api/health` - Basic health status
+- Application automatically validates RPC connectivity on startup
+- WebSocket connections include auto-reconnection logic
+
+## Docker
+
+### Local Docker Build
+
+```bash
+# Build the image
+docker build -t ritual-scan .
+
+# Run locally
+docker run -p 3000:3000 \
+  -e NEXT_PUBLIC_RETH_RPC_URL=http://your-rpc:8545 \
+  -e NEXT_PUBLIC_RETH_WS_URL=ws://your-rpc:8546 \
+  ritual-scan
+```
+
+### Docker Compose
+
+```bash
+# Run with docker-compose
+docker-compose up --build
+
+# Run in detached mode
+docker-compose up -d
+```
+
+## Monitoring
+
+The application includes built-in monitoring features:
+
+- Real-time WebSocket connection status
+- RPC endpoint health validation  
+- Performance metrics for smart caching
+- Error tracking and reconnection attempts
+
+## Makefile Commands
+
+The project includes a comprehensive Makefile in the `scripts/` directory with the following targets:
+
+### Development
+- `make dev` - Start development server
+- `make build` - Build the application  
+- `make test` - Run tests
+- `make lint` - Run linting
+- `make clean` - Clean build artifacts and dependencies
+- `make install` - Install dependencies
+
+### Environment Setup
+- `make env-setup` - Create environment files from templates
+- `make env-validate` - Validate environment configuration
+
+### Docker Development  
+- `make docker-dev-build` - Build development Docker image
+- `make docker-dev-run` - Run development container with hot reload
+- `make docker-dev-compose` - Start development with docker-compose
+- `make docker-dev-stop` - Stop development containers
+
+### Docker Production
+- `make docker-build` - Build production Docker image
+- `make docker-run` - Run production container
+- `make docker-prod-compose` - Start production stack with docker-compose
+- `make docker-stop` - Stop and remove production container
+
+### Registry Operations
+- `make docker-push` - Build and push to registry
+- `make docker-pull` - Pull from registry
+- `make docker-tag` - Tag image for registry
+
+### GKE Deployment
+- `make setup-gke PROJECT_ID=your-project` - Setup GKE cluster
+- `make deploy-gke PROJECT_ID=your-project` - Deploy to GKE cluster
+- `make gke-status` - Check GKE deployment status
+- `make gke-logs` - View GKE pod logs
+- `make gke-scale REPLICAS=3` - Scale GKE deployment
+
+### Container Management
+- `make docker-logs` - Show container logs
+- `make docker-shell` - Access container shell
+- `make docker-health` - Check container health
+- `make docker-stats` - Show container statistics
+
+### Cleanup
+- `make docker-clean` - Clean up Docker resources
+- `make docker-clean-all` - Clean up all Docker resources (destructive)
+- `make gke-cleanup` - Delete GKE resources
+
+### Utilities
+- `make version` - Show version information
+- `make help` - Display all available commands
+- `make security-scan` - Run security scan on Docker image
+
+## Troubleshooting
+
+### Common Issues
+
+**Build Failures:**
+```bash
+# Clean and rebuild
+make clean && make build
+
+# Check TypeScript errors
+npm run type-check
+```
+
+**WebSocket Connection Issues:**
+```bash
+# Test WebSocket endpoint
+wscat -c ws://your-rpc:8546
+
+# Check RPC connectivity  
+curl -X POST http://your-rpc:8545 \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
+```
+
+**Deployment Issues:**
+```bash
+# Check Cloud Build logs
+gcloud builds list --limit=5
+
+# Verify service status
+gcloud run services describe ritual-scan --region=us-central1
+
+# Check container logs
+gcloud logs read --service=ritual-scan --limit=50
+```
+
+**Performance Issues:**
+- Check RPC endpoint latency
+- Verify WebSocket connection stability
+- Monitor memory usage with smart caching enabled
+- Review browser console for client-side errors
+
+### Debug Mode
+
+Enable debug logging for troubleshooting:
+
+```bash
+# Local development
+NEXT_PUBLIC_DEBUG_MODE=true npm run dev
+
+# Production deployment
+gcloud run services update ritual-scan \
+  --set-env-vars="NEXT_PUBLIC_DEBUG_MODE=true"
+```
+
+## Documentation
+
+- [Environment Setup](./docs/environment.md) - Configuration options
+- [Deployment](./docs/DEPLOYMENT.md) - Production deployment guide
+
+## Tech Stack
+
+- Frontend: Next.js 15, React 19, TypeScript
+- Styling: Tailwind CSS, Radix UI components  
+- Real-time: WebSocket connections, smart caching
+- State: Zustand, React Query
+- Charts: Plotly.js for data visualization
+- Testing: Playwright end-to-end tests
+- Deployment: Docker, Kubernetes, Vercel
+
+## Ritual Chain Features
+
+### Transaction Types Supported
 
 | Type | Description | System Account | Features |
 |------|-------------|----------------|----------|
@@ -135,103 +365,69 @@ The explorer automatically connects to RETH WebSocket endpoints for:
 | 0x11 | AsyncCommitment | 0x...fa8e | TEE execution commitment |
 | 0x12 | AsyncSettlement | 0x...fa9e | Final settlement with fee distribution |
 
-### **Enhanced Search Patterns**
+### Enhanced Search Patterns
 
-- `callId:10567` - Search scheduled transactions by Call ID
-- `origin:0x...` - Find transactions by origin hash
-- `10567` - Numeric Call ID search
+- **callId:10567** - Search scheduled transactions by Call ID
+- **origin:0x...** - Find transactions by origin hash
+- **10567** - Numeric Call ID search
 - System account detection (fa7e, fa8e, fa9e)
 - Precompile addresses (0x...0801, etc.)
 
-##  Pages & Features
+### Pages & Features
 
-### **Core Pages**
+#### Core Pages
 - **Homepage** - Network overview, latest blocks/transactions, stats
-- **Blocks** - Real-time block explorer with detailed views  
+- **Blocks** - Real-time block explorer with detailed views
 - **Transactions** - Live transaction feed with type filtering
 - **Mempool** - Real-time mempool monitoring with WebSocket updates
 
-### **Ritual-Specific Pages**  
+#### Ritual-Specific Pages
 - **Scheduled** - Scheduled transaction pool with Call ID filtering
 - **Ritual Analytics** - Advanced Ritual Chain metrics and adoption
 - **Transaction Details** - Enhanced with async flow visualization
 - **System Accounts** - Special pages for Ritual system addresses
 
-##  Live Demo
-
-**Production URL:** [Browser Preview Available](http://127.0.0.1:63901)
-
-**Real-Time Features:**
--  WebSocket connection to RETH nodes
--  Live mempool updates every 2 seconds  
--  New block notifications
--  Scheduled transaction monitoring
--  Connection status indicators
-
-## Development
-
-### **Project Structure**
+## Project Structure
 
 ```
-src/
-├── app/                    # Next.js App Router pages
-│   ├── page.tsx           # Homepage
-│   ├── blocks/            # Block explorer
-│   ├── transactions/      # Transaction explorer  
-│   ├── mempool/           # Real-time mempool
-│   ├── scheduled/         # Scheduled transactions
-│   ├── ritual-analytics/  # Ritual analytics
-│   └── tx/[txHash]/       # Transaction details
-├── components/            # Reusable components
-│   ├── AsyncTransactionFlow.tsx    # Async flow visualization
-│   ├── TransactionTypeBadge.tsx    # Type indicators
-│   └── EnhancedTransactionDetails.tsx  # Enhanced details
-├── hooks/                 # React hooks
-│   └── useRealtime.ts     # Real-time WebSocket hooks
-├── lib/                   # Core libraries
-│   ├── reth-client.ts     # Enhanced RETHClient
-│   └── realtime-websocket.ts  # WebSocket manager
-└── styles/               # Tailwind CSS configuration
+ritual-scan/
+├── src/                      # Application source code
+│   ├── app/                  # Next.js App Router pages
+│   ├── components/           # React components
+│   ├── hooks/                # Custom hooks
+│   └── lib/                  # Core libraries (reth-client, websocket manager)
+├── docs/                     # Documentation
+│   ├── admin/                # Admin API docs
+│   ├── architecture/         # Architecture decisions
+│   ├── deployment/           # Deployment guides
+│   └── *.md                  # System design, development logs
+├── k8s/                      # Kubernetes manifests
+├── scripts/                  # Build and deployment scripts
+├── tools/                    # Development utilities
+│   ├── debug/                # Debug scripts
+│   └── test/                 # Test scripts
+├── tests/                    # Playwright E2E tests
+├── archive/                  # Old configs and scripts
+├── public/                   # Static assets
+├── FRONTEND_ONBOARDING.md    # Start here for new engineers
+├── README.md                 # This file
+├── deploy-to-ding-fish.sh    # Production deployment
+└── package.json              # Dependencies
 ```
 
-### **Key Components**
+## Contributing
 
-- **RETHClient** - Enhanced with Ritual-specific RPC methods
-- **WebSocket Manager** - High-performance real-time updates
-- **Transaction Flow** - Async relationship visualization  
-- **System Recognition** - Ritual system account handling
-- **Search Enhancement** - Call ID and precompile search
+Please read our [Contributing Guide](./CONTRIBUTING.md) for development setup and guidelines.
 
-##  Testing
+### Development Workflow
 
-### **Automated Testing**
-
-```bash
-# Run component tests
-npm test
-
-# Generate screenshots  
-npm run screenshots
-
-# Test navigation flows
-node test-navigation.js
-```
-
-### **Real-Time Testing**
-
-The explorer includes extensive real-time testing:
-- WebSocket connection monitoring
-- Transaction type detection
-- System account recognition  
-- Async flow visualization
-- Call ID search functionality
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/your-feature`
+3. Make your changes and test
+4. Commit using conventional commits: `git commit -m "feat: add feature"`
+5. Push to your branch: `git push origin feature/your-feature`
+6. Open a Pull Request
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
----
-
-<div align="center">
-  <strong>Built for the Ritual Network ecosystem</strong>
-</div>
+This project is licensed under the MIT License - see the [LICENSE](./LICENSE) file for details.

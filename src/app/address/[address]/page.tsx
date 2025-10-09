@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { rethClient } from '@/lib/reth-client'
+import { getRealtimeManager } from '@/lib/realtime-websocket'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { Navigation } from '@/components/Navigation'
@@ -44,21 +45,18 @@ export default function AddressPage() {
       loadAddressInfo()
       loadTransactions()
 
-      // Set up real-time updates
-      const ws = rethClient.createWebSocketConnection(
-        (newBlock) => {
-          console.log('New block, checking for address updates:', newBlock.number)
-          // Check if any transactions in the new block involve this address
-          checkBlockForAddress(newBlock)
-        },
-        (error) => {
-          console.error('WebSocket error on address page:', error)
-        }
-      )
+      // Set up real-time updates using WebSocket manager
+      const manager = getRealtimeManager()
+      if (manager) {
+        const unsubscribe = manager.subscribe(`address-${address}`, (update: any) => {
+          if (update.type === 'block') {
+            console.log('New block, checking for address updates:', update.data.number)
+            checkBlockForAddress(update.data)
+          }
+        })
 
-      return () => {
-        if (ws) {
-          ws.close()
+        return () => {
+          unsubscribe()
         }
       }
     }
@@ -116,11 +114,30 @@ export default function AddressPage() {
     try {
       setTxLoading(true)
       
-      // Get recent blocks and search for transactions involving this address
-      const recentBlocks = await rethClient.getRecentBlocks(50)
+      console.log(`Loading transactions for address: ${address}`)
+      
+      // Check WebSocket manager cache first (has up to 500 blocks!)
+      const manager = (typeof window !== 'undefined' && (window as any).__realtimeManager) 
+        ? (window as any).__realtimeManager 
+        : null
+      
+      let blocksToSearch: any[] = []
+      
+      if (manager) {
+        const cachedBlocks = manager.getCachedBlocks ? manager.getCachedBlocks() : []
+        console.log(`Found ${cachedBlocks.length} blocks in cache`)
+        blocksToSearch = cachedBlocks
+      }
+      
+      // If no cache, fetch recent blocks
+      if (blocksToSearch.length === 0) {
+        console.log('No cache, fetching recent blocks...')
+        blocksToSearch = await rethClient.getRecentBlocks(100) // Increased from 50
+      }
+      
       const addressTransactions: Transaction[] = []
 
-      for (const block of recentBlocks) {
+      for (const block of blocksToSearch) {
         if (block.transactions && Array.isArray(block.transactions)) {
           for (const tx of block.transactions) {
             if (tx.from?.toLowerCase() === address.toLowerCase() || 
@@ -135,17 +152,19 @@ export default function AddressPage() {
                 value: tx.value ? (parseInt(tx.value, 16) / 1e18).toFixed(6) : '0',
                 gasUsed: tx.gas ? parseInt(tx.gas, 16).toString() : undefined,
                 gasPrice: tx.gasPrice ? (parseInt(tx.gasPrice, 16) / 1e9).toFixed(2) : undefined,
-                status: 'success' // We'll assume success for now
+                status: 'success'
               })
             }
           }
         }
       }
 
+      console.log(`Found ${addressTransactions.length} transactions for address`)
+      
       // Sort by timestamp descending
       addressTransactions.sort((a, b) => b.timestamp - a.timestamp)
       
-      setTransactions(addressTransactions.slice(0, 20)) // Show first 20
+      setTransactions(addressTransactions.slice(0, 50)) // Show first 50
     } catch (error: any) {
       console.error('Error loading transactions:', error)
     } finally {
@@ -216,8 +235,7 @@ export default function AddressPage() {
                 <Link href="/mempool" className="text-lime-300 hover:text-white px-3 py-2 text-sm font-medium transition-colors">Mempool</Link>
                 <Link href="/scheduled" className="text-lime-300 hover:text-white px-3 py-2 text-sm font-medium transition-colors">Scheduled</Link>
                 <Link href="/async" className="text-lime-300 hover:text-white px-3 py-2 text-sm font-medium transition-colors">Async</Link>
-                <Link href="/analytics" className="text-lime-300 hover:text-white px-3 py-2 text-sm font-medium transition-colors">Analytics</Link>
-                <Link href="/gas-tracker" className="text-lime-300 hover:text-white px-3 py-2 text-sm font-medium transition-colors">Gas Tracker</Link>
+                <Link href="/charts" className="text-lime-300 hover:text-white px-3 py-2 text-sm font-medium transition-colors">Analytics</Link>
                 <Link href="/settings" className="text-lime-300 hover:text-white px-3 py-2 text-sm font-medium transition-colors">Settings</Link>
               </nav>
             </div>
@@ -254,8 +272,7 @@ export default function AddressPage() {
                 <Link href="/mempool" className="text-lime-300 hover:text-white px-3 py-2 text-sm font-medium transition-colors">Mempool</Link>
                 <Link href="/scheduled" className="text-lime-300 hover:text-white px-3 py-2 text-sm font-medium transition-colors">Scheduled</Link>
                 <Link href="/async" className="text-lime-300 hover:text-white px-3 py-2 text-sm font-medium transition-colors">Async</Link>
-                <Link href="/analytics" className="text-lime-300 hover:text-white px-3 py-2 text-sm font-medium transition-colors">Analytics</Link>
-                <Link href="/gas-tracker" className="text-lime-300 hover:text-white px-3 py-2 text-sm font-medium transition-colors">Gas Tracker</Link>
+                <Link href="/charts" className="text-lime-300 hover:text-white px-3 py-2 text-sm font-medium transition-colors">Analytics</Link>
                 <Link href="/settings" className="text-lime-300 hover:text-white px-3 py-2 text-sm font-medium transition-colors">Settings</Link>
               </nav>
             </div>

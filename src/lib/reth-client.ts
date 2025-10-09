@@ -116,25 +116,55 @@ export class RETHClient {
 
   constructor(initialConfig?: RpcConfig) {
     const defaultConfig: RpcConfig = {
-      primary: 'http://104.196.32.199:8545',
-      websocket: 'ws://104.196.32.199:8546',
+      primary: process.env.NEXT_PUBLIC_RETH_RPC_URL || 'http://104.196.102.16:8545',
+      websocket: process.env.NEXT_PUBLIC_RETH_WS_URL || 'ws://104.196.102.16:8546',
       name: 'Default RETH'
     }
     
     this.config = initialConfig || defaultConfig
     this.rpcUrl = this.config.primary
     this.backupRpcUrl = this.config.backup || this.config.primary
-    this.wsUrl = this.config.websocket || 'ws://104.196.32.199:8546'
+    this.wsUrl = this.config.websocket || 'ws://104.196.102.16:8546'
     
-    // Load from localStorage if available
+    // FORCE MIGRATION to new RPC endpoint 104.196.102.16
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('reth-client-config')
       if (saved) {
         try {
           const savedConfig = JSON.parse(saved)
-          this.updateConfiguration(savedConfig, false) // Don't save again
+          
+          // Check if using any old IP - if so, FORCE update to new IP
+          const hasOldIP = savedConfig.primary?.includes('34.73.191.15') || 
+                          savedConfig.primary?.includes('35.196.202.163') || 
+                          savedConfig.primary?.includes('35.185.40.237') ||
+                          savedConfig.websocket?.includes('34.73.191.15') ||
+                          savedConfig.websocket?.includes('35.196.202.163') ||
+                          savedConfig.websocket?.includes('35.185.40.237')
+          
+          if (hasOldIP) {
+            console.log('🔄 FORCE MIGRATING RPC config from old IP to 104.196.102.16')
+            console.log('Old config:', savedConfig)
+            
+            // Clear localStorage completely and use new defaults
+            localStorage.removeItem('reth-client-config')
+            localStorage.removeItem('ritual-scan-cache')
+            localStorage.removeItem('ritual-scan-leaderboard-cache')
+            
+            // Use fresh default config
+            this.config = defaultConfig
+            this.rpcUrl = this.config.primary
+            this.backupRpcUrl = this.config.backup || this.config.primary
+            this.wsUrl = this.config.websocket || 'ws://104.196.102.16:8546'
+            
+            // Save new config
+            this.updateConfiguration(this.config, true)
+            console.log('✅ Migration complete - using:', this.config)
+          } else {
+            this.updateConfiguration(savedConfig, false)
+          }
         } catch (e) {
-          console.warn('Failed to parse saved RPC config')
+          console.warn('Failed to parse saved RPC config, using defaults')
+          localStorage.removeItem('reth-client-config')
         }
       }
     }
@@ -145,7 +175,7 @@ export class RETHClient {
     this.config = { ...newConfig }
     this.rpcUrl = this.config.primary
     this.backupRpcUrl = this.config.backup || this.config.primary
-    this.wsUrl = this.config.websocket || 'ws://104.196.32.199:8546'
+    this.wsUrl = this.config.websocket || 'ws://104.196.102.16:8546'
     
     if (persist && typeof window !== 'undefined') {
       localStorage.setItem('reth-client-config', JSON.stringify(this.config))
@@ -182,9 +212,24 @@ export class RETHClient {
         id: Date.now()
       }
 
-      const response = await fetch(rpcUrl, {
+      // Use proxy if on HTTPS to avoid mixed content errors
+      const isBrowser = typeof window !== 'undefined'
+      const isHttps = isBrowser && window.location.protocol === 'https:'
+      const useProxy = isBrowser && isHttps && rpcUrl.startsWith('http://')
+      const targetUrl = useProxy ? '/api/rpc-proxy' : rpcUrl
+      
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json'
+      }
+      
+      // Send RPC URL to proxy via header
+      if (useProxy) {
+        headers['x-rpc-url'] = rpcUrl
+      }
+
+      const response = await fetch(targetUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(payload),
         signal: AbortSignal.timeout(5000) // 5 second timeout
       })
@@ -215,30 +260,68 @@ export class RETHClient {
       id: Date.now()
     }
 
+    // Determine the URL to use based on environment
+    const isBrowser = typeof window !== 'undefined'
+    const isHttps = isBrowser && window.location.protocol === 'https:'
+    
+    // Use proxy for browser HTTPS to avoid mixed content errors
+    const useProxy = isBrowser && isHttps
+    const targetUrl = useProxy ? '/api/rpc-proxy' : this.rpcUrl
+
     try {
-      const response = await fetch(this.rpcUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload)
-      })
-
-      if (!response.ok) {
-        throw new Error(`RPC call failed: ${response.statusText}`)
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 10000) // 10s timeout
+      
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
       }
-
-      const data = await response.json()
+      
+      // Send actual RPC URL to proxy via header (for dynamic settings)
+      if (useProxy) {
+        headers['x-rpc-url'] = this.rpcUrl
+      }
+      
+      const response = await fetch(targetUrl, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload),
+        signal: controller.signal
+      })
+      
+      clearTimeout(timeoutId)
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      }
+      
+      let data
+      try {
+        data = await response.json()
+      } catch (jsonError) {
+        throw new Error(`Invalid JSON response from RPC: ${jsonError}`)
+      }
       
       if (data.error) {
         throw new Error(`RPC error: ${data.error.message}`)
       }
-
       return data.result
     } catch (error) {
-      console.warn('Primary RPC failed, trying backup...', error)
+      // Suppress common network timeout errors from background polling
+      const errorMsg = (error as any)?.message || ''
+      const isNetworkError = errorMsg.includes('Failed to fetch') || 
+                            errorMsg.includes('aborted') ||
+                            errorMsg.includes('timeout')
       
-      // Try backup RPC
+      // Only log errors that aren't transient network issues
+      if (!isNetworkError) {
+        console.error(`Failed to call ${method}:`, error)
+      }
+      
+      // Try backup RPC if available and not already using proxy
+      if (!this.backupRpcUrl || this.backupRpcUrl === this.rpcUrl || (isBrowser && isHttps)) {
+        throw error
+      }
+      
       try {
         const response = await fetch(this.backupRpcUrl, {
           method: 'POST',
@@ -248,7 +331,13 @@ export class RETHClient {
           body: JSON.stringify(payload)
         })
 
-        const data = await response.json()
+        let data
+        try {
+          data = await response.json()
+        } catch (jsonError) {
+          throw new Error(`Invalid JSON response from backup RPC: ${jsonError}`)
+        }
+        
         if (data.error) {
           throw new Error(`Backup RPC error: ${data.error.message}`)
         }
